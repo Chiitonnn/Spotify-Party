@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../utils/constants.dart';
+import 'login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -50,9 +51,12 @@ class _HomeScreenState extends State<HomeScreen> {
     await prefs.remove(AppConstants.keyUserId);
     await prefs.remove(AppConstants.keyUserData);
     
-    // Recharger l'app pour revenir au login
+    // FORCER le rechargement complet de l'app
     if (mounted) {
-      Navigator.pushReplacementNamed(context, '/');
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+        (Route<dynamic> route) => false,
+      );
     }
   }
 
