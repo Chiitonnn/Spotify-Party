@@ -83,13 +83,14 @@ class _HomeScreenState extends State<HomeScreen> {
       body: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             if (_userName != null)
               Column(
                 children: [
                   Text(
                     'Bonjour, $_userName! 🎉',
+                    textAlign: TextAlign.center,
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 24,
@@ -99,6 +100,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 10),
                   const Text(
                     'Vous êtes connecté avec succès!',
+                    textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Color(0xFF1DB954),
                       fontSize: 16,
@@ -117,6 +119,7 @@ class _HomeScreenState extends State<HomeScreen> {
             
             const Text(
               'Spotify Party',
+              textAlign: TextAlign.center,
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 32,
@@ -127,11 +130,11 @@ class _HomeScreenState extends State<HomeScreen> {
             
             const Text(
               'Créez ou rejoignez une session musicale collaborative',
+              textAlign: TextAlign.center,
               style: TextStyle(
                 color: Colors.grey,
                 fontSize: 16,
               ),
-              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 50),
             
