@@ -144,7 +144,6 @@ class _HomeScreenState extends State<HomeScreen> {
               
               // BOUTON CRÉER SESSION
               SizedBox(
-                width: double.infinity, // Prendre toute la largeur disponible
                 child: ElevatedButton(
                   onPressed: _createSession,
                   style: ElevatedButton.styleFrom(
@@ -165,7 +164,6 @@ class _HomeScreenState extends State<HomeScreen> {
               
               // BOUTON REJOINDRE SESSION
               SizedBox(
-                width: double.infinity, // Prendre toute la largeur disponible
                 child: ElevatedButton(
                   onPressed: _joinSession,
                   style: ElevatedButton.styleFrom(
