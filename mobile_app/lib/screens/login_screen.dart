@@ -271,40 +271,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   
-                  // NOUVEAU BOUTON - Si token présent dans URL
-                  if (_hasTokenInUrl) ...[
-                    const SizedBox(height: 20),
-                    const Text(
-                      '✅ Authentification réussie!',
-                      style: TextStyle(
-                        color: Color(0xFF1DB954),
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    ElevatedButton(
-                      onPressed: _useTokenFromUrl,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                      ),
-                      child: const Text(
-                        'Accéder à l\'application',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    const Text(
-                      'Cliquez ici pour finaliser votre connexion',
-                      style: TextStyle(color: Colors.grey, fontSize: 12),
-                    ),
-                  ],
-                  
                   if (!kIsWeb) ...[
                     const SizedBox(height: 20),
                     const Text(
