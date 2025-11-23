@@ -6,11 +6,12 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 // Screens
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
+import 'services/api_service.dart';
+import 'utils/constants.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Orientation portrait uniquement
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
@@ -19,8 +20,52 @@ void main() async {
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  final ApiService _apiService = ApiService();
+  Widget _homeWidget = const Center(child: CircularProgressIndicator());
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAuth();
+  }
+
+  Future<void> _checkAuth() async {
+    await _apiService.loadToken();
+    
+    // Vérifier token dans URL (callback Spotify)
+    if (kIsWeb) {
+      final uri = Uri.base;
+      final accessToken = uri.queryParameters['access_token'];
+      
+      if (accessToken != null && accessToken.isNotEmpty) {
+        print('🎯 Token détecté dans URL, sauvegarde...');
+        await _apiService.saveToken(accessToken);
+        final userId = uri.queryParameters['user_id'];
+        if (userId != null) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString(AppConstants.keyUserId, userId);
+        }
+      }
+    }
+    
+    // Vérifier token existant
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString(AppConstants.keyAccessToken);
+    
+    setState(() {
+      _homeWidget = (token != null && token.isNotEmpty) 
+          ? const HomeScreen()
+          : const LoginScreen();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +86,7 @@ class MyApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      home: const HomeScreen(), // ← DIRECT vers home pour test
+      home: _homeWidget,
     );
   }
 }
