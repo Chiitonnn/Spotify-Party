@@ -6,7 +6,6 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 // Screens
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
-import 'screens/auth_callback_screen.dart';
 import 'screens/create_session_screen.dart';
 import 'screens/join_session_screen.dart';
 import 'screens/session_screen.dart';
@@ -36,7 +35,7 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   final ApiService _apiService = ApiService();
-  String? _initialRoute = '/';
+  String _initialRoute = '/';
   bool _isCheckingAuth = true;
 
   @override
@@ -48,26 +47,23 @@ class _MyAppState extends State<MyApp> {
   Future<void> _determineInitialRoute() async {
     await _apiService.loadToken();
     
-    // Vérifier d'abord les paramètres d'URL (pour le callback Spotify)
+    // Vérifier SI on est dans une redirection Spotify avec token
     if (kIsWeb) {
       final uri = Uri.base;
       final accessToken = uri.queryParameters['access_token'];
       final userId = uri.queryParameters['user_id'];
       
-      print('🌐 URL analysée: ${uri.toString()}');
-      print('🔑 Token dans URL: $accessToken');
-      print('👤 UserId dans URL: $userId');
-      
-      // Si on a un token dans l'URL, on sauvegarde et on redirige vers home
-      if (accessToken != null && accessToken.isNotEmpty && userId != null && userId.isNotEmpty) {
-        print('✅ Token détecté dans URL, sauvegarde...');
+      // Si l'URL contient un token, on est dans un callback Spotify
+      if (accessToken != null && accessToken.isNotEmpty) {
+        print('🎯 Détection callback Spotify - Token présent dans URL');
+        
+        // Sauvegarder le token et rediriger vers home
         await _apiService.saveToken(accessToken);
         
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(AppConstants.keyUserId, userId);
-        
-        // Pas de nettoyage d'URL - on garde les paramètres
-        print('ℹ️ Utilisateur connecté avec succès!');
+        if (userId != null) {
+          await prefs.setString(AppConstants.keyUserId, userId);
+        }
         
         setState(() {
           _initialRoute = '/home';
@@ -77,15 +73,11 @@ class _MyAppState extends State<MyApp> {
       }
     }
     
-    // Vérifier l'authentification existante dans le storage
+    // Vérifier l'authentification existante normale
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString(AppConstants.keyAccessToken);
-    final userId = prefs.getString(AppConstants.keyUserId);
     
-    print('📝 Token stocké: $token');
-    print('👤 UserId stocké: $userId');
-    
-    if (token != null && token.isNotEmpty && userId != null && userId.isNotEmpty) {
+    if (token != null && token.isNotEmpty) {
       setState(() {
         _initialRoute = '/home';
         _isCheckingAuth = false;
@@ -100,7 +92,6 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-    // Afficher un loading pendant la vérification de l'authentification
     if (_isCheckingAuth) {
       return MaterialApp(
         home: Scaffold(
@@ -112,7 +103,7 @@ class _MyAppState extends State<MyApp> {
                 const CircularProgressIndicator(color: Color(0xFF1DB954)),
                 const SizedBox(height: 20),
                 const Text(
-                  'Connexion en cours...',
+                  'Vérification...',
                   style: TextStyle(color: Colors.white, fontSize: 16),
                 ),
               ],
@@ -155,7 +146,6 @@ class _MyAppState extends State<MyApp> {
       routes: {
         '/': (context) => const LoginScreen(),
         '/home': (context) => const HomeScreen(),
-        '/auth-callback': (context) => const AuthCallbackScreen(),
         '/create-session': (context) => const CreateSessionScreen(),
         '/join-session': (context) => const JoinSessionScreen(),
         '/session': (context) => const SessionScreen(),

@@ -16,6 +16,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final ApiService _apiService = ApiService();
   bool _isLoading = true;
+  bool _hasTokenInUrl = false;
 
   @override
   void initState() {
@@ -24,6 +25,18 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _checkExistingAuth() async {
+    // Vérifier si l'URL contient un token (callback Spotify)
+    if (kIsWeb) {
+      final uri = Uri.base;
+      final accessToken = uri.queryParameters['access_token'];
+      
+      if (accessToken != null && accessToken.isNotEmpty) {
+        setState(() {
+          _hasTokenInUrl = true;
+        });
+      }
+    }
+    
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString(AppConstants.keyAccessToken);
     
@@ -53,7 +66,7 @@ class _LoginScreenState extends State<LoginScreen> {
         // Web : ouvrir dans le même onglet
         await launchUrl(
           Uri.parse(authUrl),
-          mode: LaunchMode.inAppWebView, // Important pour rester dans l'app
+          mode: LaunchMode.inAppWebView,
         );
       } else {
         // Pour mobile : ouvrir l'URL d'auth
@@ -72,6 +85,39 @@ class _LoginScreenState extends State<LoginScreen> {
             backgroundColor: Colors.red,
           ),
         );
+      }
+    }
+  }
+
+  // NOUVELLE MÉTHODE : Utiliser le token présent dans l'URL
+  Future<void> _useTokenFromUrl() async {
+    if (kIsWeb) {
+      final uri = Uri.base;
+      final accessToken = uri.queryParameters['access_token'];
+      final userId = uri.queryParameters['user_id'];
+      
+      if (accessToken != null && accessToken.isNotEmpty) {
+        setState(() => _isLoading = true);
+        
+        try {
+          await _apiService.saveToken(accessToken);
+          
+          final prefs = await SharedPreferences.getInstance();
+          if (userId != null) {
+            await prefs.setString(AppConstants.keyUserId, userId);
+          }
+          
+          if (mounted) {
+            Navigator.pushReplacementNamed(context, '/home');
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Erreur: $e')),
+            );
+            setState(() => _isLoading = false);
+          }
+        }
       }
     }
   }
@@ -175,7 +221,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   CircularProgressIndicator(color: Color(0xFF1DB954)),
                   SizedBox(height: 20),
                   Text(
-                    'Vérification...',
+                    'Chargement...',
                     style: TextStyle(color: Colors.white, fontSize: 16),
                   ),
                 ],
@@ -208,6 +254,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 40),
                   
+                  // BOUTON PRINCIPAL - Authentification Spotify
                   ElevatedButton(
                     onPressed: _loginWithSpotify,
                     style: ElevatedButton.styleFrom(
@@ -223,6 +270,40 @@ class _LoginScreenState extends State<LoginScreen> {
                       style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                   ),
+                  
+                  // NOUVEAU BOUTON - Si token présent dans URL
+                  if (_hasTokenInUrl) ...[
+                    const SizedBox(height: 20),
+                    const Text(
+                      '✅ Authentification réussie!',
+                      style: TextStyle(
+                        color: Color(0xFF1DB954),
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    ElevatedButton(
+                      onPressed: _useTokenFromUrl,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                      ),
+                      child: const Text(
+                        'Accéder à l\'application',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'Cliquez ici pour finaliser votre connexion',
+                      style: TextStyle(color: Colors.grey, fontSize: 12),
+                    ),
+                  ],
                   
                   if (!kIsWeb) ...[
                     const SizedBox(height: 20),
