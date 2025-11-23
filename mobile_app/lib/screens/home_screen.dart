@@ -72,6 +72,7 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         title: const Text('Spotify Party'),
+        centerTitle: true, // Centrer le titre de l'AppBar
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
@@ -80,112 +81,122 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            if (_userName != null)
-              Column(
-                children: [
-                  Text(
-                    'Bonjour, $_userName! 🎉',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
+      body: Center( // Widget Center principal pour centrer toute la colonne
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center, // Centrer verticalement
+            crossAxisAlignment: CrossAxisAlignment.center, // Centrer horizontalement
+            children: [
+              if (_userName != null)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Text(
+                      'Bonjour, $_userName! 🎉',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 10),
-                  const Text(
-                    'Vous êtes connecté avec succès!',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Color(0xFF1DB954),
-                      fontSize: 16,
+                    const SizedBox(height: 10),
+                    const Text(
+                      'Vous êtes connecté avec succès!',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Color(0xFF1DB954),
+                        fontSize: 16,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 30),
-                ],
+                    const SizedBox(height: 30),
+                  ],
+                ),
+              
+              const Icon(
+                Icons.music_note,
+                size: 80,
+                color: Color(0xFF1DB954),
               ),
-            
-            const Icon(
-              Icons.music_note,
-              size: 80,
-              color: Color(0xFF1DB954),
-            ),
-            const SizedBox(height: 20),
-            
-            const Text(
-              'Spotify Party',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 10),
-            
-            const Text(
-              'Créez ou rejoignez une session musicale collaborative',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.grey,
-                fontSize: 16,
-              ),
-            ),
-            const SizedBox(height: 50),
-            
-            // BOUTON CRÉER SESSION
-            ElevatedButton(
-              onPressed: _createSession,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF1DB954),
-                foregroundColor: Colors.black,
-                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24),
+              const SizedBox(height: 20),
+              
+              const Text(
+                'Spotify Party',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 32,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-              child: const Text(
-                'Créer une session',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-            ),
-            const SizedBox(height: 20),
-            
-            // BOUTON REJOINDRE SESSION
-            ElevatedButton(
-              onPressed: _joinSession,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24),
-                ),
-              ),
-              child: const Text(
-                'Rejoindre une session',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-            ),
-            const SizedBox(height: 30),
-            
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20.0),
-              child: Text(
-                'Partagez vos playlists et votez pour la prochaine musique en temps réel!',
+              const SizedBox(height: 10),
+              
+              const Text(
+                'Créez ou rejoignez une session musicale collaborative',
+                textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Colors.grey,
-                  fontSize: 14,
+                  fontSize: 16,
                 ),
-                textAlign: TextAlign.center,
               ),
-            ),
-          ],
+              const SizedBox(height: 50),
+              
+              // BOUTON CRÉER SESSION
+              SizedBox(
+                width: double.infinity, // Prendre toute la largeur disponible
+                child: ElevatedButton(
+                  onPressed: _createSession,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1DB954),
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                  ),
+                  child: const Text(
+                    'Créer une session',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              
+              // BOUTON REJOINDRE SESSION
+              SizedBox(
+                width: double.infinity, // Prendre toute la largeur disponible
+                child: ElevatedButton(
+                  onPressed: _joinSession,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                  ),
+                  child: const Text(
+                    'Rejoindre une session',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 30),
+              
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20.0),
+                child: Text(
+                  'Partagez vos playlists et votez pour la prochaine musique en temps réel!',
+                  style: TextStyle(
+                    color: Colors.grey,
+                    fontSize: 14,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
