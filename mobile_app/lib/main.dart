@@ -6,6 +6,11 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 // Screens
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
+import 'screens/create_session_screen.dart';
+import 'screens/join_session_screen.dart';
+import 'screens/session_screen.dart';
+
+// Services
 import 'services/api_service.dart';
 import 'utils/constants.dart';
 
@@ -86,7 +91,29 @@ class _MyAppState extends State<MyApp> {
         ),
         useMaterial3: true,
       ),
-      home: _homeWidget,
+      // ROUTES COMPLÈTES - TOUTES LES PAGES
+      initialRoute: '/',
+      routes: {
+        '/': (context) => _homeWidget,
+        '/home': (context) => const HomeScreen(),
+        '/login': (context) => const LoginScreen(),
+        '/create-session': (context) => const CreateSessionScreen(),
+        '/join-session': (context) => const JoinSessionScreen(),
+        '/session': (context) => const SessionScreen(),
+      },
+      onGenerateRoute: (settings) {
+        // Gestion des routes avec arguments
+        if (settings.name == '/session' && settings.arguments != null) {
+          return MaterialPageRoute(
+            builder: (context) => SessionScreen(),
+            settings: settings,
+          );
+        }
+        return null;
+      },
+      onUnknownRoute: (settings) {
+        return MaterialPageRoute(builder: (context) => const LoginScreen());
+      },
     );
   }
 }

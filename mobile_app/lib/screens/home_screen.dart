@@ -3,6 +3,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../utils/constants.dart';
 import 'login_screen.dart';
+// Assurez-vous que ces fichiers existent :
+import 'create_session_screen.dart';
+import 'join_session_screen.dart';
+import 'session_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -131,19 +135,39 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 50),
             
-            _buildActionButton(
-              "Créer une session",
-              Icons.add,
-              const Color(0xFF1DB954),
-              _createSession,
+            // BOUTON CRÉER SESSION
+            ElevatedButton(
+              onPressed: _createSession,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1DB954),
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                ),
+              ),
+              child: const Text(
+                'Créer une session',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
             ),
             const SizedBox(height: 20),
             
-            _buildActionButton(
-              "Rejoindre une session",
-              Icons.group,
-              Colors.blue,
-              _joinSession,
+            // BOUTON REJOINDRE SESSION
+            ElevatedButton(
+              onPressed: _joinSession,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                ),
+              ),
+              child: const Text(
+                'Rejoindre une session',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
             ),
             const SizedBox(height: 30),
             
@@ -156,36 +180,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   fontSize: 14,
                 ),
                 textAlign: TextAlign.center,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildActionButton(String text, IconData icon, Color color, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: color),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: color),
-            const SizedBox(width: 10),
-            Text(
-              text,
-              style: const TextStyle(
-                color: Colors.white, 
-                fontSize: 18,
-                fontWeight: FontWeight.w500,
               ),
             ),
           ],
