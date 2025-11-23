@@ -45,49 +45,20 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<void> _determineInitialRoute() async {
-    await _apiService.loadToken();
+    print('🚀 Début détermination route');
     
-    // Vérifier SI on est dans une redirection Spotify avec token
-    if (kIsWeb) {
-      final uri = Uri.base;
-      final accessToken = uri.queryParameters['access_token'];
-      final userId = uri.queryParameters['user_id'];
-      
-      // Si l'URL contient un token, on est dans un callback Spotify
-      if (accessToken != null && accessToken.isNotEmpty) {
-        print('🎯 Détection callback Spotify - Token présent dans URL');
-        
-        // Sauvegarder le token et rediriger vers home
-        await _apiService.saveToken(accessToken);
-        
-        final prefs = await SharedPreferences.getInstance();
-        if (userId != null) {
-          await prefs.setString(AppConstants.keyUserId, userId);
-        }
-        
-        setState(() {
-          _initialRoute = '/home';
-          _isCheckingAuth = false;
-        });
-        return;
-      }
-    }
+    // FORCER un délai pour voir si c'est le loading qui bloque
+    await Future.delayed(Duration(seconds: 2));
     
-    // Vérifier l'authentification existante normale
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString(AppConstants.keyAccessToken);
+    print('✅ Délai terminé');
     
-    if (token != null && token.isNotEmpty) {
-      setState(() {
-        _initialRoute = '/home';
-        _isCheckingAuth = false;
-      });
-    } else {
-      setState(() {
-        _initialRoute = '/';
-        _isCheckingAuth = false;
-      });
-    }
+    // Ignorer toute la logique d'auth et aller directement vers home
+    setState(() {
+      _initialRoute = '/home';
+      _isCheckingAuth = false;
+    });
+    
+    print('🎯 Route définie: /home');
   }
 
   @override
