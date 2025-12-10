@@ -5,7 +5,7 @@ const API_URL = 'https://spotify-party.onrender.com/api'; // Changez pour votre 
 
 const api = axios.create({
   baseURL: API_URL,
-  timeout: 10000,
+  timeout: 60000,
   headers: {
     'Content-Type': 'application/json'
   }
