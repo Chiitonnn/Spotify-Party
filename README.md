@@ -1,36 +1,18 @@
 # Spotify-Party
 
-Installer flutter
+    cd backend
+    npm install
+
+    npm run dev
 
 
-    cd .\backend\
+    npx create-expo-app mobile
+    cd mobile
+    
+    npm install @react-navigation/stack
+    npm install @react-navigation/stack @react-native-async-storage/async-storage
 
-    python -m venv venv
+    npm install @react-navigation/stack @react-native-async-storage/async-storage react-native-swipe-gestures axios
+    npm install socket.io-client
 
-    .\venv\Scripts\activate
-
-    pip install -r requirements.txt
-
-    cd ..
-
-    cd .\mobile_app\
-
-    flutter build web  
-
-    cd ..
-
-    cd .\backend\
-
-    python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-
-Pour tester le projet sur vos PC c'est : cd mobile_app
-                                        >> flutter run -d chrome
-
-et pour les push sur git et dcp sur render c'est : cd mobile_app
-                                                    >> flutter build web --no-wasm-dry-run
-                                                    >> cd ..
-                                                    >> Copy-Item -Recurse -Force mobile_app\build\web\* frontend\
-                                                    >> git add .
-                                                    >> git commit -m "fix bouton"
-                                                    >> git push
-                                                    
+    npx expo install expo-web-browser
