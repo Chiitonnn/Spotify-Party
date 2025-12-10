@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Request, Depends
 from fastapi.responses import RedirectResponse
 import requests
+import urllib.parse
+import json
 
 from app.core.config import settings
 from app.services.spotify import get_current_user
@@ -20,7 +22,15 @@ def login():
     client_id = settings.SPOTIFY_CLIENT_ID
     redirect_uri = settings.SPOTIFY_REDIRECT_URI
 
-    scopes = "user-read-email user-read-private streaming user-read-playback-state user-modify-playback-state"
+    # 🎵 SCOPES MODIFIÉS : Ajout de streaming pour le Web Playback SDK
+    scopes = " ".join([
+        "user-read-email",
+        "user-read-private",
+        "streaming",                    # ✅ Pour le Web Playback SDK
+        "user-read-playback-state",
+        "user-modify-playback-state",
+        "user-read-currently-playing"   # ✅ Pour voir ce qui joue
+    ])
 
     auth_url = (
         "https://accounts.spotify.com/authorize"
@@ -36,7 +46,7 @@ def login():
 @router.get("/callback")
 def callback(
     request: Request,
-    session: Session = Depends(get_session),  # 👈 injection de la session DB
+    session: Session = Depends(get_session),
 ):
     code = request.query_params.get("code")
     if not code:
@@ -72,7 +82,7 @@ def callback(
     if not spotify_id:
         return {"error": "no_spotify_id", "profile": user_profile}
 
-    # 👉 Chercher si l'utilisateur existe déjà
+    # Chercher si l'utilisateur existe déjà
     statement = select(SpotifyUser).where(SpotifyUser.spotify_id == spotify_id)
     existing_user = session.exec(statement).first()
 
@@ -103,12 +113,40 @@ def callback(
     session.commit()
     session.refresh(user)
 
+    # Rediriger vers le frontend avec les infos user
+    user_data = {
+        "id": user.id,
+        "spotify_id": user.spotify_id,
+        "display_name": user.display_name,
+        "email": user.email,
+        "access_token": access_token,  # 🎵 IMPORTANT : On envoie le token au frontend
+    }
+    
+    user_json = json.dumps(user_data)
+    user_encoded = urllib.parse.quote(user_json)
+    
+    frontend_url = f"http://localhost:3000/callback?user={user_encoded}"
+    return RedirectResponse(url=frontend_url)
+
+
+@router.get("/me")
+def get_me(
+    spotify_id: str,
+    session: Session = Depends(get_session),
+):
+    """
+    Récupère les infos d'un utilisateur par son spotify_id
+    """
+    statement = select(SpotifyUser).where(SpotifyUser.spotify_id == spotify_id)
+    user = session.exec(statement).first()
+    
+    if not user:
+        return {"error": "User not found"}
+    
     return {
-        "status": "Connexion Spotify + enregistrement OK ✅",
-        "user": {
-            "id": user.id,
-            "spotify_id": user.spotify_id,
-            "display_name": user.display_name,
-            "email": user.email,
-        },
+        "id": user.id,
+        "spotify_id": user.spotify_id,
+        "display_name": user.display_name,
+        "email": user.email,
+        "access_token": user.access_token,  # 🎵 Pour le Web Playback SDK
     }

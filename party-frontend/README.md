@@ -182,14 +182,3 @@ npm run preview
 
 Les fichiers de production seront dans `dist/`
 
-## 🤝 Contribution
-
-N'hésite pas à ouvrir des issues ou PR !
-
-## 📄 Licence
-
-MIT
-
----
-
-**Bon développement ! 🎉**

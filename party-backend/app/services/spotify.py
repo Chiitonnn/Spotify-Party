@@ -13,10 +13,16 @@ def get_current_user(access_token: str) -> dict:
     response = requests.get("https://api.spotify.com/v1/me", headers=headers)
 
     if response.status_code != 200:
+        # 🔥 CORRECTION : Gérer les réponses vides
+        try:
+            error_data = response.json()
+        except:
+            error_data = {"message": "Empty response from Spotify"}
+        
         return {
             "error": "spotify_api_error",
             "status_code": response.status_code,
-            "details": response.json(),
+            "details": error_data,
         }
 
     return response.json()
@@ -25,7 +31,6 @@ def get_current_user(access_token: str) -> dict:
 def get_user_playlists(access_token: str, limit: int = 20) -> dict:
     """
     Récupère les playlists de l'utilisateur connecté.
-    Pour l'instant, on ne gère pas la pagination avancée.
     """
     headers = {
         "Authorization": f"Bearer {access_token}"
@@ -68,7 +73,6 @@ def get_playlist_tracks(access_token: str, playlist_id: str, limit: int = 100) -
 def pick_random_track_from_user(access_token: str) -> dict:
     """
     Choisit une musique aléatoire dans les playlists de l'utilisateur.
-    Renvoie un dict avec les infos principales du morceau.
     """
     playlists_data = get_user_playlists(access_token)
 
@@ -92,7 +96,7 @@ def pick_random_track_from_user(access_token: str) -> dict:
     if not track:
         return {"error": "invalid_track_data"}
 
-    # On extrait les infos utiles
+    # Extraire les infos
     artists = ", ".join(a["name"] for a in track.get("artists", []))
 
     images = track.get("album", {}).get("images", [])
