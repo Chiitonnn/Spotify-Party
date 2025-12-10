@@ -4,10 +4,10 @@ import { generateToken } from '../services/token.service.js';
 
 export const login = (req, res) => {
   try {
-    console.log('SPOTIFY_REDIRECT_URI:', process.env.SPOTIFY_REDIRECT_URI); // AJOUTEZ CETTE LIGNE
+    console.log('SPOTIFY_REDIRECT_URI:', process.env.SPOTIFY_REDIRECT_URI);
     const spotifyApi = createSpotifyApi();
     const authURL = spotifyApi.createAuthorizeURL(SPOTIFY_SCOPES, 'state');
-    console.log('Auth URL:', authURL); // AJOUTEZ CETTE LIGNE
+    console.log('Auth URL:', authURL);
     res.json({ authUrl: authURL });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -55,10 +55,13 @@ export const callback = async (req, res) => {
     
     const jwtToken = generateToken(user._id);
     
+    // ✅ Redirection vers le deep link mobile
     res.redirect(`spotifyparty://callback?token=${jwtToken}&userId=${user._id}`);
   } catch (error) {
     console.error('Auth callback error:', error);
-    res.redirect(`spotifyparty://callback?error=${error.message}`);
+    // ✅ Extraire le message d'erreur proprement
+    const errorMessage = error.message || error.toString() || 'Authentication failed';
+    res.redirect(`spotifyparty://callback?error=${encodeURIComponent(errorMessage)}`);
   }
 };
 
