@@ -4,21 +4,22 @@ import api from '../config/api';
 
 // ✅ URL de votre backend Render
 const BACKEND_URL = 'https://spotify-party.onrender.com';
-const REDIRECT_URI = 'mobile://callback';
+const REDIRECT_URI = 'spotifyparty://callback';
 
 WebBrowser.maybeCompleteAuthSession();
 
 export const openSpotifyAuth = async () => {
   try {
-    // ✅ URL directe vers l'endpoint Spotify (pas d'appel API d'abord)
-    const authUrl = `${BACKEND_URL}/api/auth/spotify`;
+    // 1. Récupérer l'URL d'auth depuis le backend
+    const response = await api.get('/auth/login');
+    const authUrl = response.data.authUrl;
     
     console.log('🔐 Opening Spotify auth:', authUrl);
 
-    // ✅ Utiliser WebBrowser au lieu de Linking pour gérer le callback
+    // 2. Ouvrir le navigateur
     const result = await WebBrowser.openAuthSessionAsync(
       authUrl,
-      REDIRECT_URI
+      'spotifyparty://callback'  // ✅ Bon
     );
 
     console.log('Auth result:', result);

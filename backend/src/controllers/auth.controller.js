@@ -55,10 +55,10 @@ export const callback = async (req, res) => {
     
     const jwtToken = generateToken(user._id);
     
-    res.redirect(`${process.env.FRONTEND_URL || 'exp://localhost:8081'}?token=${jwtToken}&userId=${user._id}`);
+    res.redirect(`spotifyparty://callback?token=${jwtToken}&userId=${user._id}`);
   } catch (error) {
     console.error('Auth callback error:', error);
-    res.redirect(`${process.env.FRONTEND_URL || 'exp://localhost:8081'}?error=${error.message}`);
+    res.redirect(`spotifyparty://callback?error=${error.message}`);
   }
 };
 
