@@ -33,3 +33,4 @@ et pour les push sur git et dcp sur render c'est : cd mobile_app
                                                     >> git add .
                                                     >> git commit -m "fix bouton"
                                                     >> git push
+                                                    
