@@ -25,12 +25,9 @@ export const login = (req, res) => {
 export const callback = async (req, res) => {
   const { code, error: spotifyError } = req.query;
 
-  console.log('🔄 [CALLBACK] Received callback from Spotify');
-  console.log('📊 [CALLBACK] Query params:', { 
-    hasCode: !!code, 
-    codeLength: code?.length,
-    spotifyError: spotifyError 
-  });
+  console.log('🔄 [CALLBACK] ========== DÉBUT CALLBACK ==========');
+  console.log('📊 [CALLBACK] Query params:', req.query);
+  console.log('📊 [CALLBACK] Headers:', req.headers);
 
   // Si Spotify renvoie une erreur
   if (spotifyError) {
@@ -46,68 +43,127 @@ export const callback = async (req, res) => {
 
   try {
     console.log('🎫 [CALLBACK] Exchanging code for tokens...');
-    const spotifyApi = createSpotifyApi();
-    const data = await spotifyApi.authorizationCodeGrant(code);
+    console.log('🔑 [CALLBACK] Using client ID:', process.env.SPOTIFY_CLIENT_ID?.substring(0, 10) + '...');
+    console.log('🔑 [CALLBACK] Using redirect URI:', process.env.SPOTIFY_REDIRECT_URI);
     
-    console.log('✅ [CALLBACK] Tokens received from Spotify');
+    const spotifyApi = createSpotifyApi();
+    
+    // Tenter l'échange du code
+    let data;
+    try {
+      data = await spotifyApi.authorizationCodeGrant(code);
+      console.log('✅ [CALLBACK] Token exchange successful');
+    } catch (spotifyError) {
+      console.error('❌ [CALLBACK] Spotify API error during token exchange:', {
+        message: spotifyError.message,
+        statusCode: spotifyError.statusCode,
+        body: spotifyError.body
+      });
+      
+      // Extraire le vrai message d'erreur de Spotify
+      let errorMsg = 'Spotify authentication failed';
+      if (spotifyError.body?.error_description) {
+        errorMsg = spotifyError.body.error_description;
+      } else if (spotifyError.body?.error) {
+        errorMsg = spotifyError.body.error;
+      } else if (spotifyError.message) {
+        errorMsg = spotifyError.message;
+      }
+      
+      console.log('📤 [CALLBACK] Redirecting with error:', errorMsg);
+      return res.redirect(`spotifyparty://callback?error=${encodeURIComponent(errorMsg)}`);
+    }
+    
     const { access_token, refresh_token, expires_in } = data.body;
     
     if (!access_token) {
       throw new Error('No access token received from Spotify');
     }
     
+    console.log('🎫 [CALLBACK] Tokens received, expires in:', expires_in, 'seconds');
     spotifyApi.setAccessToken(access_token);
     
     // Récupérer le profil
     console.log('👤 [CALLBACK] Fetching user profile...');
-    const profile = await spotifyApi.getMe();
-    
-    console.log('✅ [CALLBACK] Profile received:', {
-      id: profile.body.id,
-      displayName: profile.body.display_name,
-      email: profile.body.email
-    });
+    let profile;
+    try {
+      profile = await spotifyApi.getMe();
+      console.log('✅ [CALLBACK] Profile received:', {
+        id: profile.body.id,
+        displayName: profile.body.display_name,
+        email: profile.body.email
+      });
+    } catch (profileError) {
+      console.error('❌ [CALLBACK] Error fetching profile:', profileError.message);
+      return res.redirect(`spotifyparty://callback?error=${encodeURIComponent('Failed to fetch user profile')}`);
+    }
     
     // Créer ou mettre à jour l'utilisateur
     console.log('💾 [CALLBACK] Saving user to database...');
-    let user = await User.findOne({ spotifyId: profile.body.id });
+    let user;
     
-    if (user) {
-      console.log('🔄 [CALLBACK] Updating existing user:', user._id);
-      user.spotifyAccessToken = access_token;
-      user.spotifyRefreshToken = refresh_token;
-      user.tokenExpiresAt = new Date(Date.now() + expires_in * 1000);
-      user.displayName = profile.body.display_name;
-      user.email = profile.body.email;
-      user.isPremium = profile.body.product === 'premium';
-      user.profileImage = profile.body.images?.[0]?.url;
-    } else {
-      console.log('🆕 [CALLBACK] Creating new user');
-      user = new User({
-        spotifyId: profile.body.id,
-        displayName: profile.body.display_name,
-        email: profile.body.email,
-        spotifyAccessToken: access_token,
-        spotifyRefreshToken: refresh_token,
-        tokenExpiresAt: new Date(Date.now() + expires_in * 1000),
-        isPremium: profile.body.product === 'premium',
-        profileImage: profile.body.images?.[0]?.url
+    try {
+      user = await User.findOne({ spotifyId: profile.body.id });
+      
+      if (user) {
+        console.log('🔄 [CALLBACK] Updating existing user:', user._id);
+        user.spotifyAccessToken = access_token;
+        user.spotifyRefreshToken = refresh_token;
+        user.tokenExpiresAt = new Date(Date.now() + expires_in * 1000);
+        user.displayName = profile.body.display_name;
+        user.email = profile.body.email;
+        user.isPremium = profile.body.product === 'premium';
+        user.profileImage = profile.body.images?.[0]?.url;
+      } else {
+        console.log('🆕 [CALLBACK] Creating new user');
+        user = new User({
+          spotifyId: profile.body.id,
+          displayName: profile.body.display_name,
+          email: profile.body.email,
+          spotifyAccessToken: access_token,
+          spotifyRefreshToken: refresh_token,
+          tokenExpiresAt: new Date(Date.now() + expires_in * 1000),
+          isPremium: profile.body.product === 'premium',
+          profileImage: profile.body.images?.[0]?.url
+        });
+      }
+      
+      await user.save();
+      console.log('✅ [CALLBACK] User saved successfully:', user._id);
+    } catch (dbError) {
+      console.error('❌ [CALLBACK] Database error:', {
+        message: dbError.message,
+        name: dbError.name,
+        code: dbError.code
       });
+      
+      // Vérifier si c'est une erreur de connexion MongoDB
+      if (dbError.name === 'MongoNetworkError' || dbError.name === 'MongooseServerSelectionError') {
+        return res.redirect(`spotifyparty://callback?error=${encodeURIComponent('Database connection failed')}`);
+      }
+      
+      return res.redirect(`spotifyparty://callback?error=${encodeURIComponent('Failed to save user: ' + dbError.message)}`);
     }
     
-    await user.save();
-    console.log('✅ [CALLBACK] User saved successfully:', user._id);
-    
-    const jwtToken = generateToken(user._id);
-    console.log('🎟️ [CALLBACK] JWT token generated');
+    // Générer le JWT
+    let jwtToken;
+    try {
+      jwtToken = generateToken(user._id);
+      console.log('🎟️ [CALLBACK] JWT token generated');
+    } catch (jwtError) {
+      console.error('❌ [CALLBACK] JWT generation error:', jwtError.message);
+      return res.redirect(`spotifyparty://callback?error=${encodeURIComponent('Failed to generate token')}`);
+    }
     
     // ✅ Redirection vers le deep link mobile
     const redirectUrl = `spotifyparty://callback?token=${jwtToken}&userId=${user._id}`;
-    console.log('🚀 [CALLBACK] Redirecting to:', redirectUrl);
+    console.log('🚀 [CALLBACK] Redirecting to app with success');
+    console.log('🚀 [CALLBACK] Redirect URL length:', redirectUrl.length);
     res.redirect(redirectUrl);
     
   } catch (error) {
-    console.error('❌ [CALLBACK] Error occurred:', {
+    // Catch-all pour toute erreur non prévue
+    console.error('❌ [CALLBACK] Unexpected error:', {
       name: error.name,
       message: error.message,
       stack: error.stack,
@@ -115,15 +171,24 @@ export const callback = async (req, res) => {
       body: error.body
     });
     
-    // ✅ Extraire le message d'erreur proprement
+    // ✅ CORRECTION CRITIQUE : Toujours envoyer une string, jamais un objet
     let errorMessage = 'Authentication failed';
     
-    if (error.message) {
-      errorMessage = error.message;
-    } else if (error.body?.error?.message) {
-      errorMessage = error.body.error.message;
-    } else if (typeof error === 'string') {
+    // Essayer d'extraire le meilleur message d'erreur possible
+    if (typeof error === 'string') {
       errorMessage = error;
+    } else if (error.message) {
+      errorMessage = error.message;
+    } else if (error.body?.error_description) {
+      errorMessage = error.body.error_description;
+    } else if (error.body?.error) {
+      errorMessage = error.body.error;
+    } else {
+      // Si vraiment rien ne fonctionne, stringify l'objet
+      errorMessage = JSON.stringify({
+        name: error.name,
+        message: error.message || 'Unknown error'
+      });
     }
     
     console.log('📤 [CALLBACK] Sending error to app:', errorMessage);
