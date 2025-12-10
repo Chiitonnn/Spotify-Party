@@ -1,117 +1,144 @@
-import * as WebBrowser from 'expo-web-browser';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import api from '../config/api';
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator,
+  Alert
+} from 'react-native';
+import { useAuth } from '../contexts/AuthContext';
+import * as AuthService from '../services/auth.service';
 
-// ✅ URL de votre backend Render
-const BACKEND_URL = 'https://spotify-party.onrender.com';
-const REDIRECT_URI = 'spotifyparty://callback';
+const AuthScreen = () => {
+  const [loading, setLoading] = useState(false);
+  const { login } = useAuth();
 
-WebBrowser.maybeCompleteAuthSession();
-
-export const openSpotifyAuth = async () => {
-  try {
-    // 1. Récupérer l'URL d'auth depuis le backend
-    const response = await api.get('/auth/login');
-    const authUrl = response.data.authUrl;
+  const handleLogin = async () => {
+    if (loading) return; // Empêcher les clics multiples
     
-    console.log('🔐 Opening Spotify auth:', authUrl);
-
-    // 2. Ouvrir le navigateur
-    const result = await WebBrowser.openAuthSessionAsync(
-      authUrl,
-      'spotifyparty://callback'  // ✅ Bon
-    );
-
-    console.log('Auth result:', result);
-
-    if (result.type === 'success' && result.url) {
-      return handleAuthCallback(result.url);
-    } else if (result.type === 'cancel') {
-      throw new Error('Authentication cancelled');
+    setLoading(true);
+    try {
+      console.log('🚀 Starting Spotify authentication...');
+      
+      // 1. Ouvrir l'authentification Spotify (gère tout: ouverture, callback, parsing)
+      const result = await AuthService.openSpotifyAuth();
+      
+      console.log('✅ Auth successful, token received');
+      
+      // 2. Connecter l'utilisateur avec le token (déjà sauvegardé dans openSpotifyAuth)
+      if (result && result.token) {
+        const success = await login(result.token);
+        if (!success) {
+          throw new Error('Failed to login with token');
+        }
+        console.log('✅ User logged in successfully');
+      } else {
+        throw new Error('No token received from authentication');
+      }
+    } catch (error) {
+      console.error('❌ Login failed:', error);
+      
+      // Ne pas afficher d'alerte si l'utilisateur a annulé
+      if (error.message !== 'Authentication cancelled') {
+        Alert.alert(
+          'Erreur d\'authentification',
+          error.message || 'Impossible de se connecter à Spotify. Veuillez réessayer.',
+          [{ text: 'OK' }]
+        );
+      }
+    } finally {
+      setLoading(false);
     }
-  } catch (error) {
-    console.error('❌ Auth error:', error);
-    throw error;
-  }
+  };
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.content}>
+        <Text style={styles.logo}>🎵</Text>
+        <Text style={styles.title}>Spotify Party</Text>
+        <Text style={styles.subtitle}>
+          Votez pour la musique en soirée !
+        </Text>
+
+        <TouchableOpacity
+          style={[styles.button, loading && styles.buttonDisabled]}
+          onPress={handleLogin}
+          disabled={loading}
+        >
+          {loading ? (
+            <View style={styles.buttonContent}>
+              <ActivityIndicator color="#fff" size="small" />
+              <Text style={[styles.buttonText, { marginLeft: 10 }]}>
+                Connexion...
+              </Text>
+            </View>
+          ) : (
+            <Text style={styles.buttonText}>Se connecter avec Spotify</Text>
+          )}
+        </TouchableOpacity>
+
+        <Text style={styles.info}>
+          Connectez-vous pour créer ou rejoindre une session
+        </Text>
+      </View>
+    </View>
+  );
 };
 
-export const handleAuthCallback = async (url) => {
-  try {
-    console.log('📱 Handling callback:', url);
-
-    // Extraire le token de l'URL de callback
-    const params = new URLSearchParams(url.split('?')[1]);
-    const token = params.get('token');
-    const userId = params.get('userId');
-
-    if (!token) {
-      throw new Error('No token in callback URL');
-    }
-
-    // Sauvegarder le token
-    await AsyncStorage.setItem('jwt_token', token);
-    
-    if (userId) {
-      await AsyncStorage.setItem('user_id', userId);
-    }
-
-    console.log('✅ Token saved successfully');
-
-    return { token, userId };
-  } catch (error) {
-    console.error('❌ Callback error:', error);
-    throw error;
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  content: {
+    alignItems: 'center',
+    paddingHorizontal: 40
+  },
+  logo: {
+    fontSize: 80,
+    marginBottom: 20
+  },
+  title: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: '#1DB954',
+    marginBottom: 10
+  },
+  subtitle: {
+    fontSize: 18,
+    color: '#B3B3B3',
+    textAlign: 'center',
+    marginBottom: 50
+  },
+  button: {
+    backgroundColor: '#1DB954',
+    paddingVertical: 15,
+    paddingHorizontal: 40,
+    borderRadius: 25,
+    marginBottom: 20,
+    minWidth: 250,
+    alignItems: 'center'
+  },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+  buttonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: 'bold'
+  },
+  info: {
+    color: '#B3B3B3',
+    textAlign: 'center',
+    fontSize: 12
   }
-};
+});
 
-export const getCurrentUser = async () => {
-  try {
-    const response = await api.get('/auth/me');
-    return response.data;
-  } catch (error) {
-    console.error('Error getting current user:', error);
-    throw error;
-  }
-};
-
-export const refreshToken = async () => {
-  try {
-    const response = await api.post('/auth/refresh');
-    return response.data;
-  } catch (error) {
-    console.error('Error refreshing token:', error);
-    throw error;
-  }
-};
-
-export const getStoredToken = async () => {
-  try {
-    const token = await AsyncStorage.getItem('jwt_token');
-    return token;
-  } catch (error) {
-    console.error('Error getting stored token:', error);
-    return null;
-  }
-};
-
-export const logout = async () => {
-  try {
-    await AsyncStorage.removeItem('jwt_token');
-    await AsyncStorage.removeItem('user_id');
-    await AsyncStorage.removeItem('user');
-    console.log('Logged out successfully');
-  } catch (error) {
-    console.error('Error during logout:', error);
-    throw error;
-  }
-};
-
-export const isAuthenticated = async () => {
-  try {
-    const token = await AsyncStorage.getItem('jwt_token');
-    return !!token;
-  } catch (error) {
-    console.error('Error checking authentication:', error);
-    return false;
-  }
-};
+export default AuthScreen;
