@@ -4,7 +4,7 @@ import string
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session, select
+from sqlmodel import Session, select, func, delete
 
 from app.db.session import get_session
 from app.models.room import Room
@@ -16,6 +16,8 @@ from app.models.vote import Vote
 
 from app.services.spotify import pick_random_track_from_user
 from app.models.vote import Vote  # si pas déjà importé
+
+from app.schemas import CreateRoomRequest, JoinRoomRequest, VoteRequest
 
 
 router = APIRouter(
@@ -34,31 +36,35 @@ def generate_room_code(length: int = 6) -> str:
 
 @router.post("/", response_model=Room)
 def create_room(
-    host_spotify_id: str,
-    like_threshold: int = 3,
+    body: CreateRoomRequest,
     session: Session = Depends(get_session),
 ):
     """
     Crée une nouvelle room.
+
+    Reçoit un JSON :
+    {
+      "host_spotify_id": "...",
+      "like_threshold": 4
+    }
     """
 
-    # 1) Trouver l'hôte dans spotify_users
-    statement = select(SpotifyUser).where(SpotifyUser.spotify_id == host_spotify_id)
+    # On cherche l'hôte dans spotify_users
+    statement = select(SpotifyUser).where(SpotifyUser.spotify_id == body.host_spotify_id)
     host = session.exec(statement).first()
 
     if not host:
         raise HTTPException(status_code=404, detail="Hôte (SpotifyUser) introuvable")
 
-    # 2) Générer un code unique
+    # Générer un code unique
     code = generate_room_code()
     while session.exec(select(Room).where(Room.code == code)).first():
         code = generate_room_code()
 
-    # 3) Créer la room
     room = Room(
         code=code,
         host_user_id=host.id,
-        like_threshold=like_threshold,
+        like_threshold=body.like_threshold,
         is_active=True,
     )
 
@@ -66,7 +72,7 @@ def create_room(
     session.commit()
     session.refresh(room)
 
-    # 4) Ajouter l'hôte comme participant aussi
+    # Ajouter l'hôte comme participant
     participant = RoomParticipant(
         room_id=room.id,
         user_id=host.id,
@@ -75,6 +81,7 @@ def create_room(
     session.commit()
 
     return room
+
 
 
 @router.get("/", response_model=List[Room])
@@ -102,28 +109,33 @@ def get_room_by_code(
 @router.post("/{code}/join")
 def join_room(
     code: str,
-    spotify_id: str,
+    body: JoinRoomRequest,
     session: Session = Depends(get_session),
 ):
     """
     Un utilisateur (via son spotify_id) rejoint une room.
+
+    Body JSON :
+    {
+      "spotify_id": "..."
+    }
     """
 
-    # 1) Récupérer la room
+    # Room
     statement_room = select(Room).where(Room.code == code)
     room = session.exec(statement_room).first()
 
     if not room:
         raise HTTPException(status_code=404, detail="Room introuvable")
 
-    # 2) Récupérer l'utilisateur
-    statement_user = select(SpotifyUser).where(SpotifyUser.spotify_id == spotify_id)
+    # User
+    statement_user = select(SpotifyUser).where(SpotifyUser.spotify_id == body.spotify_id)
     user = session.exec(statement_user).first()
 
     if not user:
         raise HTTPException(status_code=404, detail="Utilisateur Spotify introuvable")
 
-    # 3) Vérifier s'il est déjà participant
+    # Déjà participant ?
     statement_participant = select(RoomParticipant).where(
         RoomParticipant.room_id == room.id,
         RoomParticipant.user_id == user.id,
@@ -137,7 +149,6 @@ def join_room(
             "user_id": user.id,
         }
 
-    # 4) Ajouter comme participant
     participant = RoomParticipant(
         room_id=room.id,
         user_id=user.id,
@@ -151,6 +162,7 @@ def join_room(
         "room_code": room.code,
         "user_id": user.id,
     }
+
 
 
 @router.get("/{code}/participants")
@@ -424,4 +436,83 @@ def get_next_track(
         "image_url": room.current_track_image_url,
         "likes": likes_count,
         "threshold": room.like_threshold
+    }
+
+@router.post("/{code}/next-round")
+def next_round(
+    code: str,
+    session: Session = Depends(get_session),
+):
+    """
+    Passe à la musique suivante :
+    - supprime les votes de la room
+    - choisit un joueur aléatoire
+    - choisit une musique aléatoire dans ses playlists
+    - met à jour la room avec cette nouvelle musique
+    """
+
+    # 1) Récupérer la room
+    room_stmt = select(Room).where(Room.code == code)
+    room = session.exec(room_stmt).first()
+    if not room:
+        raise HTTPException(status_code=404, detail="Room introuvable")
+
+    # 2) Récupérer les participants
+    participants_stmt = select(RoomParticipant).where(
+        RoomParticipant.room_id == room.id
+    )
+    participants = session.exec(participants_stmt).all()
+    if not participants:
+        raise HTTPException(status_code=400, detail="Aucun participant dans la room")
+
+    # 3) Supprimer tous les votes de cette room (nouvelle manche, on repart à zéro)
+    delete_stmt = delete(Vote).where(Vote.room_id == room.id)
+    session.exec(delete_stmt)
+    session.commit()
+
+    # 4) Choisir un participant aléatoire
+    random_participant = random.choice(participants)
+
+    user_stmt = select(SpotifyUser).where(SpotifyUser.id == random_participant.user_id)
+    user = session.exec(user_stmt).first()
+    if not user:
+        raise HTTPException(status_code=500, detail="Participant lié à aucun SpotifyUser")
+
+    if not user.access_token:
+        raise HTTPException(status_code=500, detail="Pas de token Spotify pour cet utilisateur")
+
+    # 5) Choisir une musique aléatoire dans ses playlists
+    track_info = pick_random_track_from_user(user.access_token)
+
+    if "error" in track_info:
+        return {
+            "status": "error",
+            "room_code": room.code,
+            "user": {
+                "id": user.id,
+                "spotify_id": user.spotify_id,
+                "display_name": user.display_name,
+            },
+            "error": track_info["error"],
+        }
+
+    # 6) Mettre à jour la room avec la nouvelle musique courante
+    room.current_track_uri = track_info["track_uri"]
+    room.current_track_name = track_info["name"]
+    room.current_track_artists = track_info["artists"]
+    room.current_track_image_url = track_info["image_url"]
+
+    session.add(room)
+    session.commit()
+    session.refresh(room)
+
+    return {
+        "status": "next_round_started",
+        "room_code": room.code,
+        "chosen_user": {
+            "id": user.id,
+            "spotify_id": user.spotify_id,
+            "display_name": user.display_name,
+        },
+        "track": track_info,
     }
