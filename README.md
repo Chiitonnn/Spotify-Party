@@ -26,4 +26,4 @@
 
     npx expo start --clear
 
-    
+    a
