@@ -7,8 +7,10 @@ import {
   FlatList,
   Alert,
   Share,
-  ActivityIndicator
+  ActivityIndicator,
+  StatusBar
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { useSession } from '../contexts/SessionContext';
 import * as SessionService from '../services/session.service';
@@ -19,11 +21,9 @@ const SessionScreen = ({ navigation, route }) => {
   const { sessionId } = route.params;
   const [starting, setStarting] = useState(false);
 
-  // Vérification robuste pour savoir si on est l'hôte
   const isHost = currentSession?.hostId?._id === user?._id || currentSession?.hostId === user?._id;
 
   useEffect(() => {
-    // Recharger la session à chaque fois qu'on revient sur cet écran (pour mettre à jour le compteur de titres)
     const unsubscribe = navigation.addListener('focus', () => {
       loadSession();
     });
@@ -35,8 +35,7 @@ const SessionScreen = ({ navigation, route }) => {
       const session = await SessionService.getSession(sessionId);
       setCurrentSession(session);
     } catch (error) {
-      // Si la session est introuvable ou fermée
-      // Alert.alert('Erreur', 'Session introuvable');
+      // Gérer l'erreur silencieusement ou rediriger
     }
   };
 
@@ -54,19 +53,18 @@ const SessionScreen = ({ navigation, route }) => {
     navigation.navigate('Vote', { sessionId });
   };
 
-  // 🚀 ACTION LANCER LA SOIRÉE (Hôte uniquement)
   const handleStartParty = async () => {
     if (!currentSession.approvedQueue || currentSession.approvedQueue.length === 0) {
-      Alert.alert('Trop tôt !', 'Il faut d\'abord voter pour des musiques (0 titre validé).');
+      Alert.alert('Trop tôt !', 'Aucune musique validée pour le moment.');
       return;
     }
 
     try {
       setStarting(true);
       await SessionService.startParty(sessionId);
-      Alert.alert('C\'est parti !', 'La musique devrait se lancer sur votre téléphone.');
+      Alert.alert('Succès', 'La musique se lance sur votre appareil !');
     } catch (error) {
-      Alert.alert('Erreur', 'Impossible de lancer la musique. Vérifiez que Spotify est ouvert sur votre téléphone.');
+      Alert.alert('Erreur', 'Vérifiez que Spotify est ouvert sur votre téléphone.');
     } finally {
       setStarting(false);
     }
@@ -75,19 +73,16 @@ const SessionScreen = ({ navigation, route }) => {
   const handleLeaveSession = async () => {
     Alert.alert(
       'Quitter',
-      isHost ? 'En quittant, la session sera fermée pour tous.' : 'Êtes-vous sûr de vouloir quitter ?',
+      isHost ? 'Fermer la session pour tout le monde ?' : 'Voulez-vous quitter ?',
       [
         { text: 'Annuler', style: 'cancel' },
         {
-          text: 'Quitter',
+          text: isHost ? 'Fermer' : 'Quitter',
           style: 'destructive',
           onPress: async () => {
             try {
-              if (isHost) {
-                await SessionService.closeSession(sessionId);
-              } else {
-                await SessionService.leaveSession(sessionId);
-              }
+              if (isHost) await SessionService.closeSession(sessionId);
+              else await SessionService.leaveSession(sessionId);
               navigation.navigate('Home');
             } catch (error) {
               Alert.alert('Erreur', 'Impossible de quitter');
@@ -98,69 +93,76 @@ const SessionScreen = ({ navigation, route }) => {
     );
   };
 
-  if (!currentSession) {
-    return null;
-  }
+  if (!currentSession) return <View style={styles.container} />;
 
   return (
     <View style={styles.container}>
-      {/* En-tête avec code */}
+      <StatusBar barStyle="light-content" />
+
+      {/* HEADER : INFO SESSION */}
       <View style={styles.header}>
-        <View style={styles.codeContainer}>
-          <Text style={styles.codeLabel}>Code de session</Text>
-          <Text style={styles.code}>{currentSession.code}</Text>
+        <View>
+          <Text style={styles.subtitle}>Session en cours</Text>
+          <Text style={styles.title}>{currentSession.name}</Text>
         </View>
-        <TouchableOpacity style={styles.shareButton} onPress={handleShareCode}>
-          <Text style={styles.shareButtonText}>📤 Partager</Text>
+        <TouchableOpacity onPress={handleLeaveSession} style={styles.closeBtn}>
+          <Ionicons name="close" size={24} color="#FFF" />
         </TouchableOpacity>
       </View>
 
-      {/* Info session */}
-      <View style={styles.infoContainer}>
-        <Text style={styles.sessionName}>{currentSession.name}</Text>
-        <Text style={styles.threshold}>
-          {currentSession.approvedQueue?.length || 0} titres validés pour la soirée
-        </Text>
-        {isHost && (
-          <View style={styles.hostBadge}>
-            <Text style={styles.hostBadgeText}>👑 Vous êtes l'hôte</Text>
+      {/* TICKET CODE */}
+      <View style={styles.codeCard}>
+        <Text style={styles.codeLabel}>CODE D'ACCÈS</Text>
+        <TouchableOpacity onPress={handleShareCode} style={styles.codeRow}>
+          <Text style={styles.code}>{currentSession.code}</Text>
+          <Ionicons name="copy-outline" size={24} color="#1DB954" />
+        </TouchableOpacity>
+        <Text style={styles.codeInstruction}>Partagez ce code pour inviter des amis</Text>
+      </View>
+
+      {/* STATS RAPIDES */}
+      <View style={styles.statsRow}>
+        <View style={styles.statItem}>
+          <Text style={styles.statValue}>{currentSession.approvedQueue?.length || 0}</Text>
+          <Text style={styles.statLabel}>Validées</Text>
+        </View>
+        <View style={styles.divider} />
+        <View style={styles.statItem}>
+          <Text style={styles.statValue}>{currentSession.participants?.length || 0}</Text>
+          <Text style={styles.statLabel}>Invités</Text>
+        </View>
+      </View>
+
+      {/* LISTE PARTICIPANTS */}
+      <Text style={styles.sectionTitle}>Participants</Text>
+      <FlatList
+        data={currentSession.participants}
+        keyExtractor={(item) => item.userId._id || item.userId}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingLeft: 0, paddingBottom: 20 }}
+        renderItem={({ item }) => (
+          <View style={styles.participantItem}>
+            <View style={styles.avatar}>
+              <Text style={{fontSize: 20}}>👤</Text>
+            </View>
+            <Text style={styles.participantName} numberOfLines={1}>
+              {item.userId.displayName || 'Invité'}
+            </Text>
           </View>
         )}
-      </View>
+      />
 
-      {/* Participants */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>
-          Participants ({currentSession.participants?.length || 0})
-        </Text>
-        <FlatList
-          data={currentSession.participants}
-          horizontal
-          keyExtractor={(item) => item.userId._id || item.userId}
-          renderItem={({ item }) => (
-            <View style={styles.participantCard}>
-              <Text style={styles.participantEmoji}>👤</Text>
-              <Text style={styles.participantName}>
-                {item.userId.displayName || 'Invité'}
-              </Text>
-            </View>
-          )}
-          style={styles.participantsList}
-        />
-      </View>
-
-      {/* Actions */}
-      <View style={styles.actions}>
-        
-        {/* BOUTON VOTE (Pour tout le monde) */}
+      {/* FOOTER ACTIONS */}
+      <View style={styles.footer}>
         <TouchableOpacity
           style={styles.voteButton}
           onPress={handleStartVoting}
         >
-          <Text style={styles.voteButtonText}>🗳️ Aller voter</Text>
+          <Ionicons name="thumbs-up" size={20} color="#FFF" />
+          <Text style={styles.voteButtonText}>Commencer à voter</Text>
         </TouchableOpacity>
 
-        {/* 👇 BOUTON HOST : LANCER LA MUSIQUE */}
         {isHost && (
           <TouchableOpacity
             style={styles.startButton}
@@ -168,21 +170,15 @@ const SessionScreen = ({ navigation, route }) => {
             disabled={starting}
           >
             {starting ? (
-              <ActivityIndicator color="#FFF" />
+              <ActivityIndicator color="#000" />
             ) : (
-              <Text style={styles.startButtonText}>🚀 LANCER LA SOIRÉE</Text>
+              <>
+                <Text style={styles.startButtonText}>LANCER LA SOIRÉE</Text>
+                <Ionicons name="play" size={20} color="#000" />
+              </>
             )}
           </TouchableOpacity>
         )}
-
-        <TouchableOpacity
-          style={styles.leaveButton}
-          onPress={handleLeaveSession}
-        >
-          <Text style={styles.leaveButtonText}>
-            {isHost ? 'Fermer la session' : 'Quitter'}
-          </Text>
-        </TouchableOpacity>
       </View>
     </View>
   );
@@ -192,71 +188,85 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000',
-    padding: 20
+    paddingTop: 50,
+    paddingHorizontal: 20
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 30
+  },
+  subtitle: { color: '#1DB954', fontSize: 14, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 1 },
+  title: { color: '#FFF', fontSize: 28, fontWeight: 'bold' },
+  closeBtn: { padding: 10, backgroundColor: '#282828', borderRadius: 20 },
+
+  codeCard: {
+    backgroundColor: '#1E1E1E',
+    borderRadius: 20,
+    padding: 30,
     alignItems: 'center',
     marginBottom: 30,
-    marginTop: 20
+    borderWidth: 1,
+    borderColor: '#333'
   },
-  codeContainer: { flex: 1 },
-  codeLabel: { color: '#B3B3B3', fontSize: 12, marginBottom: 5 },
-  code: { color: '#1DB954', fontSize: 32, fontWeight: 'bold', letterSpacing: 4 },
-  shareButton: { backgroundColor: '#282828', paddingVertical: 10, paddingHorizontal: 15, borderRadius: 20 },
-  shareButtonText: { color: '#FFF', fontSize: 14 },
-  
-  infoContainer: { backgroundColor: '#282828', padding: 20, borderRadius: 15, marginBottom: 20 },
-  sessionName: { color: '#FFF', fontSize: 24, fontWeight: 'bold', marginBottom: 10 },
-  threshold: { color: '#1DB954', fontSize: 16, fontWeight: 'bold' }, // Couleur verte pour les stats
-  
-  hostBadge: { backgroundColor: '#1DB954', alignSelf: 'flex-start', paddingVertical: 5, paddingHorizontal: 15, borderRadius: 15, marginTop: 10 },
-  hostBadgeText: { color: '#FFF', fontSize: 12, fontWeight: 'bold' },
-  
-  section: { marginBottom: 20 },
-  sectionTitle: { color: '#FFF', fontSize: 18, fontWeight: 'bold', marginBottom: 15 },
-  participantsList: { flexGrow: 0 },
-  participantCard: { backgroundColor: '#282828', padding: 15, borderRadius: 10, marginRight: 10, alignItems: 'center', minWidth: 80 },
-  participantEmoji: { fontSize: 30, marginBottom: 5 },
-  participantName: { color: '#FFF', fontSize: 12, textAlign: 'center' },
+  codeLabel: { color: '#666', fontSize: 12, fontWeight: 'bold', marginBottom: 10, letterSpacing: 2 },
+  codeRow: { flexDirection: 'row', alignItems: 'center', gap: 15 },
+  code: { color: '#FFF', fontSize: 42, fontWeight: 'bold', letterSpacing: 5 },
+  codeInstruction: { color: '#B3B3B3', fontSize: 12, marginTop: 15 },
 
-  actions: { flex: 1, justifyContent: 'flex-end', gap: 15 },
-  
-  // Bouton de vote (gris foncé / discret)
+  statsRow: {
+    flexDirection: 'row',
+    backgroundColor: '#121212',
+    borderRadius: 15,
+    padding: 20,
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    marginBottom: 30
+  },
+  statItem: { alignItems: 'center' },
+  statValue: { color: '#FFF', fontSize: 24, fontWeight: 'bold' },
+  statLabel: { color: '#666', fontSize: 12 },
+  divider: { width: 1, height: '100%', backgroundColor: '#333' },
+
+  sectionTitle: { color: '#FFF', fontSize: 18, fontWeight: 'bold', marginBottom: 15 },
+  participantItem: { alignItems: 'center', marginRight: 20, width: 70 },
+  avatar: {
+    width: 60, height: 60, borderRadius: 30,
+    backgroundColor: '#282828', justifyContent: 'center', alignItems: 'center',
+    marginBottom: 8, borderWidth: 2, borderColor: '#1DB954'
+  },
+  participantName: { color: '#B3B3B3', fontSize: 12, textAlign: 'center' },
+
+  footer: {
+    marginBottom: 30,
+    gap: 15
+  },
   voteButton: {
     backgroundColor: '#282828',
     padding: 18,
-    borderRadius: 25,
+    borderRadius: 30,
+    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#B3B3B3'
+    gap: 10
   },
-  voteButtonText: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
+  voteButtonText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
 
-  // Bouton Lancer la soirée (Vert flashy)
   startButton: {
-    backgroundColor: '#1DB954', 
-    padding: 20,
-    borderRadius: 25,
+    backgroundColor: '#1DB954',
+    padding: 18,
+    borderRadius: 30,
+    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: "#1DB954",
+    gap: 10,
+    shadowColor: '#1DB954',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 6
+    shadowRadius: 10
   },
-  startButtonText: { color: '#FFF', fontSize: 20, fontWeight: 'bold', textTransform: 'uppercase' },
-
-  // Bouton Quitter (Rouge / Discret)
-  leaveButton: {
-    backgroundColor: 'transparent', // Plus discret
-    padding: 15,
-    borderRadius: 25,
-    alignItems: 'center',
-    marginTop: 10
-  },
-  leaveButtonText: { color: '#FF4444', fontSize: 16, fontWeight: 'bold' }
+  startButtonText: { color: '#000', fontSize: 16, fontWeight: 'bold' }
 });
 
 export default SessionScreen;

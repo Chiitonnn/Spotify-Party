@@ -5,66 +5,51 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  Alert
+  Alert,
+  StatusBar,
+  Dimensions
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { openSpotifyAuth } from '../services/auth.service';
-// 👇 IMPORT IMPORTANT : On a besoin du contexte
 import { useAuth } from '../contexts/AuthContext';
+
+const { width } = Dimensions.get('window');
 
 const AuthScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
-  
-  // 👇 On récupère la fonction login du contexte
   const { login } = useAuth();
 
   const handleLogin = async () => {
     setLoading(true);
-    
     try {
-      console.log('🎬 Lancement de l\'authentification...');
-      
-      // 1. On lance l'auth Spotify (ça ouvre le navigateur)
       const result = await openSpotifyAuth();
-      
-      console.log('✅ Auth réussie pour:', result.user.displayName);
-      
-      // 2. CORRECTION CRITIQUE ICI :
-      // On ne navigue plus manuellement avec navigation.replace('Home').
-      // On met à jour le Contexte. App.js va détecter le changement
-      // et afficher automatiquement l'AppNavigator (et donc le Home).
-      
       if (result.token) {
-        // Ton AuthContext attend juste le token (string), pas l'objet complet
         await login(result.token);
       } else {
         throw new Error('Pas de token reçu');
       }
-      
     } catch (error) {
-      console.error('Auth error:', error);
-      
-      if (error.message === 'Authentification annulée') {
-        console.log('ℹ️ Utilisateur a annulé l\'authentification');
-      } else {
-        Alert.alert(
-          'Erreur d\'authentification',
-          error.message || 'Une erreur est survenue lors de la connexion',
-          [{ text: 'OK' }]
-        );
+      if (error.message !== 'Authentification annulée') {
+        Alert.alert('Erreur', error.message || 'Une erreur est survenue');
       }
     } finally {
-      // On arrête le chargement seulement si ça a échoué.
-      // Si ça a réussi, le composant va être démonté de toute façon.
-      setLoading(false); 
+      setLoading(false);
     }
   };
 
   return (
     <View style={styles.container}>
+      <StatusBar barStyle="light-content" />
+      
       <View style={styles.content}>
+        {/* Logo Musical */}
+        <View style={styles.iconContainer}>
+          <Ionicons name="musical-notes" size={80} color="#1DB954" />
+        </View>
+
         <Text style={styles.title}>Spotify Party</Text>
         <Text style={styles.subtitle}>
-          Votez pour les musiques que vous voulez écouter
+          Devenez le DJ démocratique de votre soirée.
         </Text>
 
         <TouchableOpacity
@@ -73,21 +58,17 @@ const AuthScreen = ({ navigation }) => {
           disabled={loading}
         >
           {loading ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color="#000" />
           ) : (
             <>
-              <Text style={styles.buttonText}>Se connecter avec Spotify</Text>
-              <Text style={styles.spotifyIcon}>♫</Text>
+              {/* J'ai supprimé l'icône ici pour enlever le '?' */}
+              <Text style={styles.buttonText}>SE CONNECTER AVEC SPOTIFY</Text>
             </>
           )}
         </TouchableOpacity>
-
-        {loading && (
-          <Text style={styles.loadingText}>
-            Connexion en cours...
-          </Text>
-        )}
       </View>
+      
+      <Text style={styles.footerText}>Version 1.0.0</Text>
     </View>
   );
 };
@@ -96,55 +77,67 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000',
+    justifyContent: 'center',
+    padding: 30
   },
   content: {
+    alignItems: 'center',
     flex: 1,
+    justifyContent: 'center'
+  },
+  iconContainer: {
+    marginBottom: 30,
+    width: 150,
+    height: 150,
+    backgroundColor: '#121212',
+    borderRadius: 75,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 40,
+    borderWidth: 1,
+    borderColor: '#282828'
   },
   title: {
     fontSize: 42,
     fontWeight: 'bold',
-    color: '#1DB954',
+    color: '#FFF',
     marginBottom: 10,
+    textAlign: 'center'
   },
   subtitle: {
     fontSize: 16,
-    color: '#fff',
+    color: '#B3B3B3',
     textAlign: 'center',
     marginBottom: 60,
-    opacity: 0.8,
+    maxWidth: '80%',
+    lineHeight: 24
   },
   button: {
     backgroundColor: '#1DB954',
-    paddingHorizontal: 40,
-    paddingVertical: 16,
-    borderRadius: 30,
+    paddingVertical: 18,
+    paddingHorizontal: 30,
+    borderRadius: 50,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
-    maxWidth: 300,
+    elevation: 5,
+    shadowColor: '#1DB954',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
   },
-  buttonDisabled: {
-    opacity: 0.7,
-  },
+  buttonDisabled: { opacity: 0.7 },
   buttonText: {
-    color: '#fff',
+    color: '#000', // Noir sur vert pour le contraste officiel Spotify
     fontSize: 16,
     fontWeight: 'bold',
+    textTransform: 'uppercase'
   },
-  spotifyIcon: {
-    color: '#fff',
-    fontSize: 20,
-    marginLeft: 10,
-  },
-  loadingText: {
-    color: '#fff',
-    marginTop: 20,
-    opacity: 0.7,
-  },
+  footerText: {
+    color: '#333',
+    textAlign: 'center',
+    marginBottom: 20
+  }
 });
 
 export default AuthScreen;

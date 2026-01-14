@@ -7,19 +7,19 @@ import {
   StyleSheet,
   FlatList,
   ActivityIndicator,
-  Alert
+  Alert,
+  StatusBar
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { useSession } from '../contexts/SessionContext';
 import * as SpotifyService from '../services/spotify.service';
 import * as SessionService from '../services/session.service';
 
 const CreateSessionScreen = ({ navigation }) => {
-  const { user } = useAuth();
   const { setCurrentSession } = useSession();
-  const [sessionName, setSessionName] = useState('Ma Session');
+  const [sessionName, setSessionName] = useState('Spotify Party');
   const [votingThreshold, setVotingThreshold] = useState('5');
-  // 🆕 Nouveau champ pour la limite
   const [trackLimit, setTrackLimit] = useState('20');
   
   const [playlists, setPlaylists] = useState([]);
@@ -51,7 +51,7 @@ const CreateSessionScreen = ({ navigation }) => {
 
   const handleCreate = async () => {
     if (selectedPlaylists.length === 0) {
-      Alert.alert('Erreur', 'Sélectionnez au moins une playlist');
+      Alert.alert('Attention', 'Sélectionnez au moins une playlist.');
       return;
     }
 
@@ -61,31 +61,34 @@ const CreateSessionScreen = ({ navigation }) => {
         name: sessionName,
         playlistIds: selectedPlaylists,
         votingThreshold: parseInt(votingThreshold),
-        trackLimit: parseInt(trackLimit) // 👈 On envoie la limite au backend
+        trackLimit: parseInt(trackLimit)
       });
 
       setCurrentSession(session);
       navigation.replace('Session', { sessionId: session._id });
     } catch (error) {
       console.error(error);
-      Alert.alert('Erreur', 'Impossible de créer la session');
+      Alert.alert('Erreur', 'Impossible de créer la session.');
     } finally {
       setLoading(false);
     }
   };
 
-  if (loading && playlists.length === 0) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#1DB954" />
-      </View>
-    );
-  }
-
   return (
     <View style={styles.container}>
+      <StatusBar barStyle="light-content" />
+      
+      {/* Header simple */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Ionicons name="arrow-back" size={24} color="#FFF" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Nouvelle Session</Text>
+        <View style={{width: 24}} /> 
+      </View>
+
       <View style={styles.form}>
-        <Text style={styles.label}>Nom de la session</Text>
+        <Text style={styles.label}>Nom de la soirée</Text>
         <TextInput
           style={styles.input}
           value={sessionName}
@@ -94,7 +97,7 @@ const CreateSessionScreen = ({ navigation }) => {
           placeholderTextColor="#666"
         />
 
-        <View style={{flexDirection: 'row', gap: 10}}>
+        <View style={styles.row}>
           <View style={{flex: 1}}>
             <Text style={styles.label}>Votes requis</Text>
             <TextInput
@@ -102,70 +105,138 @@ const CreateSessionScreen = ({ navigation }) => {
               value={votingThreshold}
               onChangeText={setVotingThreshold}
               keyboardType="numeric"
-              placeholder="5"
-              placeholderTextColor="#666"
             />
           </View>
+          <View style={{width: 15}} />
           <View style={{flex: 1}}>
-            <Text style={styles.label}>Nbr Musiques</Text>
+            <Text style={styles.label}>Pool Musiques</Text>
             <TextInput
               style={styles.input}
               value={trackLimit}
               onChangeText={setTrackLimit}
               keyboardType="numeric"
-              placeholder="20"
-              placeholderTextColor="#666"
             />
           </View>
         </View>
 
-        <Text style={styles.label}>Sélectionnez vos playlists</Text>
+        <Text style={[styles.label, {marginTop: 20}]}>
+          Choisir les playlists ({selectedPlaylists.length})
+        </Text>
       </View>
 
-      <FlatList
-        data={playlists}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={[
-              styles.playlistItem,
-              selectedPlaylists.includes(item.id) && styles.playlistSelected
-            ]}
-            onPress={() => togglePlaylist(item.id)}
-          >
-            <Text style={styles.playlistName}>{item.name}</Text>
-            <Text style={styles.playlistTracks}>{item.tracksCount} titres</Text>
-          </TouchableOpacity>
-        )}
-        style={styles.list}
-      />
+      {loading ? (
+        <ActivityIndicator color="#1DB954" style={{marginTop: 50}} />
+      ) : (
+        <FlatList
+          data={playlists}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }}
+          renderItem={({ item }) => {
+            const isSelected = selectedPlaylists.includes(item.id);
+            return (
+              <TouchableOpacity
+                style={[styles.playlistItem, isSelected && styles.playlistSelected]}
+                onPress={() => togglePlaylist(item.id)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.iconBox}>
+                  <Ionicons name="musical-notes" size={20} color={isSelected ? "#000" : "#B3B3B3"} />
+                </View>
+                <View style={{flex: 1}}>
+                  <Text style={[styles.playlistName, isSelected && {color: '#1DB954'}]}>
+                    {item.name}
+                  </Text>
+                  <Text style={styles.playlistTracks}>{item.tracksCount} titres</Text>
+                </View>
+                {isSelected && (
+                  <Ionicons name="checkmark-circle" size={24} color="#1DB954" />
+                )}
+              </TouchableOpacity>
+            );
+          }}
+        />
+      )}
 
-      <TouchableOpacity
-        style={styles.createButton}
-        onPress={handleCreate}
-        disabled={loading}
-      >
-        <Text style={styles.createButtonText}>
-          {loading ? 'Création...' : 'Créer la session'}
-        </Text>
-      </TouchableOpacity>
+      <View style={styles.footer}>
+        <TouchableOpacity
+          style={styles.createButton}
+          onPress={handleCreate}
+          disabled={loading}
+        >
+          {loading ? (
+             <ActivityIndicator color="#000" />
+          ) : (
+            <Text style={styles.createButtonText}>Créer la session</Text>
+          )}
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' },
-  form: { padding: 20 },
-  label: { color: '#FFF', fontSize: 16, marginBottom: 10, marginTop: 10 },
-  input: { backgroundColor: '#282828', color: '#FFF', padding: 15, borderRadius: 10, fontSize: 16 },
-  list: { flex: 1, paddingHorizontal: 20 },
-  playlistItem: { backgroundColor: '#282828', padding: 15, borderRadius: 10, marginBottom: 10 },
-  playlistSelected: { backgroundColor: '#1DB954', borderWidth: 2, borderColor: '#FFF' },
+  container: { flex: 1, backgroundColor: '#000', paddingTop: 40 },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    marginBottom: 20
+  },
+  headerTitle: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
+  backBtn: { padding: 5 },
+  
+  form: { paddingHorizontal: 20, marginBottom: 10 },
+  label: { color: '#B3B3B3', fontSize: 14, marginBottom: 8, fontWeight: '600' },
+  input: {
+    backgroundColor: '#1E1E1E',
+    color: '#FFF',
+    padding: 16,
+    borderRadius: 12,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#333'
+  },
+  row: { flexDirection: 'row' },
+  
+  playlistItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#121212',
+    padding: 15,
+    borderRadius: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#282828'
+  },
+  playlistSelected: {
+    borderColor: '#1DB954',
+    backgroundColor: 'rgba(29, 185, 84, 0.1)'
+  },
+  iconBox: {
+    width: 40, height: 40,
+    borderRadius: 8,
+    backgroundColor: '#282828',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 15
+  },
   playlistName: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
-  playlistTracks: { color: '#B3B3B3', fontSize: 12, marginTop: 5 },
-  createButton: { backgroundColor: '#1DB954', margin: 20, padding: 18, borderRadius: 25, alignItems: 'center' },
-  createButtonText: { color: '#FFF', fontSize: 18, fontWeight: 'bold' }
+  playlistTracks: { color: '#666', fontSize: 12, marginTop: 4 },
+  
+  footer: {
+    padding: 20,
+    backgroundColor: '#000',
+    borderTopWidth: 1,
+    borderTopColor: '#1E1E1E'
+  },
+  createButton: {
+    backgroundColor: '#1DB954',
+    padding: 18,
+    borderRadius: 30,
+    alignItems: 'center'
+  },
+  createButtonText: { color: '#000', fontSize: 18, fontWeight: 'bold' }
 });
 
 export default CreateSessionScreen;
