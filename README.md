@@ -1,195 +1,243 @@
-# 🎵 Spotify Party - Frontend
+# 🎵 Spotify Party – Backend (FastAPI)
 
-Interface React pour l'application Spotify Party.
-
-## 🚀 Installation
-
-### Prérequis
-- Node.js 18+
-- npm ou yarn
-- Backend lancé sur `http://localhost:8000`
-
-### Installation
-```bash
-# Installer les dépendances
-npm install
-
-# Lancer le serveur de dev
-npm run dev
-```
-
-Le frontend sera accessible sur `http://localhost:3000`
-
-## 📱 Fonctionnalités
-
-### ✅ Implémenté
-- 🔐 **Connexion Spotify OAuth**
-- 🏠 **Création de room** avec seuil personnalisable
-- 🚪 **Rejoindre une room** avec code
-- 🎵 **Affichage de la musique en cours**
-- 👍👎 **Système de vote** (like/dislike)
-- 👥 **Liste des participants** avec badge hôte
-- 🎲 **Sélection aléatoire** de musique (hôte uniquement)
-- ⏭️ **Passage au tour suivant** (hôte uniquement)
-- 🔄 **Auto-refresh** de l'état de la room (toutes les 3 secondes)
-- 📊 **Barre de progression** des votes
-- ✨ **UI moderne** avec gradients
-
-### 🎨 Design
-- Interface épurée et moderne
-- Animations fluides
-- Responsive (mobile & desktop)
-- Thème violet/rose inspiré de Spotify
-
-## 🏗️ Structure
-
-```
-src/
-├── components/
-│   ├── Header.jsx           # En-tête avec info user
-│   ├── TrackCard.jsx        # Affichage musique + votes
-│   └── VoteButtons.jsx      # Boutons like/dislike
-│
-├── pages/
-│   ├── Home.jsx             # Page d'accueil
-│   ├── CreateRoom.jsx       # Création de room
-│   ├── Room.jsx             # Room principale
-│   └── Callback.jsx         # Retour OAuth
-│
-├── services/
-│   └── api.js               # Appels API backend
-│
-├── hooks/
-│   └── useUser.js           # Hook gestion user
-│
-├── App.jsx                  # App principale + routing
-├── main.jsx                 # Point d'entrée
-└── index.css                # Styles globaux
-```
-
-## 🎮 Utilisation
-
-### 1. Connexion
-1. Cliquer sur "Se connecter avec Spotify"
-2. Autoriser l'application
-3. Vous êtes redirigé vers l'accueil
-
-### 2. Créer une room
-1. Cliquer sur "Créer une Room"
-2. Choisir le seuil de likes (nombre de likes pour jouer une musique)
-3. Vous êtes redirigé vers votre room
-4. Partagez le code avec vos amis !
-
-### 3. Rejoindre une room
-1. Entrer le code à 6 caractères
-2. Cliquer sur "Rejoindre"
-3. Vous entrez dans la room
-
-### 4. Dans la room
-
-**Pour tous les participants :**
-- Voir la musique en cours
-- Voter 👍 (like) ou 👎 (dislike)
-- Voir la progression des votes
-- Voir les autres participants
-
-**Pour l'hôte uniquement :**
-- 🎲 Choisir une musique aléatoire
-- ⏭️ Passer au tour suivant (reset des votes + nouvelle musique)
-
-### 5. Système de votes
-- Chaque participant peut voter une fois par musique
-- Quand le seuil est atteint → "✅ Prêt à jouer !"
-- L'hôte peut alors lancer la musique sur Spotify (fonctionnalité à venir)
-- L'hôte peut passer au tour suivant pour proposer une nouvelle musique
-
-## 🔧 Configuration
-
-### Proxy API
-Le fichier `vite.config.js` configure un proxy vers le backend :
-```javascript
-proxy: {
-  '/auth': 'http://localhost:8000',
-  '/rooms': 'http://localhost:8000'
-}
-```
-
-### Variables d'environnement
-Pour le moment, l'URL de l'API est hardcodée dans `src/services/api.js`.
-Pour la production, créer un fichier `.env` :
-```
-VITE_API_URL=https://votre-backend.com
-```
-
-## 🐛 Debug
-
-### Le frontend ne démarre pas
-```bash
-# Nettoyer et réinstaller
-rm -rf node_modules package-lock.json
-npm install
-```
-
-### Erreurs CORS
-Vérifier que le backend a bien configuré CORS :
-```python
-# backend/app/main.py
-from fastapi.middleware.cors import CORSMiddleware
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-```
-
-### L'authentification ne marche pas
-1. Vérifier que le Redirect URI dans Spotify Dashboard contient :
-   - `http://localhost:8000/auth/callback` (backend)
-2. Vérifier que le backend tourne sur le port 8000
-3. Vérifier les credentials Spotify dans le `.env` du backend
-
-## 🚧 À venir
-
-### Phase 2 : WebSockets
-- ⏱️ Mise à jour en temps réel des votes
-- 🔔 Notifications instantanées
-- 🎵 Synchronisation de la lecture
-
-### Phase 3 : Intégration Spotify
-- ▶️ Lancer la musique directement depuis l'interface
-- ⏸️ Contrôles play/pause
-- 🔊 Contrôle du volume
-- 📱 Web Playback SDK
-
-### Phase 4 : Améliorations UX
-- 🎨 Thèmes personnalisables
-- 📊 Statistiques de la room
-- 📜 Historique des musiques jouées
-- 💬 Chat en temps réel
-
-## 📦 Build pour production
-
-```bash
-# Build
-npm run build
-
-# Preview du build
-npm run preview
-```
-
-Les fichiers de production seront dans `dist/`
-
-## 🤝 Contribution
-
-N'hésite pas à ouvrir des issues ou PR !
-
-## 📄 Licence
-
-MIT
+Backend permettant de gérer une soirée musicale interactive où chaque joueur se connecte avec son compte Spotify, vote pour des musiques, et permet à l’hôte de lancer un morceau lorsque suffisamment de “likes” sont atteints.
 
 ---
 
-**Bon développement ! 🎉**
+## 🚀 Tech Stack
+
+- **FastAPI**
+- **Python 3.11+**
+- **SQLModel** (ORM SQLite)
+- **Uvicorn**
+- **Spotify Web API (OAuth)**
+
+---
+
+## 📁 Structure du projet
+
+party-backend/
+
+│── app/
+
+│ ├── main.py
+
+│ ├── core/
+
+│ │ └── config.py
+
+│ ├── api/
+
+│ │ └── routes/
+
+│ │ ├── auth.py
+
+│ │ └── rooms.py
+
+│ ├── db/
+
+│ │ └── session.py
+
+│ ├── models/
+
+│ │ ├── user.py
+
+│ │ ├── room.py
+
+│ │ ├── room_participant.py
+
+│ │ └── vote.py
+
+│ └── services/
+
+│ └── spotify.py
+
+│
+
+├── .env
+
+├── requirements.txt
+
+└── venv/
+
+
+---
+
+## ⚙️ Installation & Setup
+
+### 1️⃣ Installer l’environnement
+
+```bash
+cd party-backend
+python -m venv venv
+.\venv\Scripts\activate
+pip install -r requirements.txt
+
+Si requirements.txt n’existe pas encore :
+
+pip freeze > requirements.txt
+
+2️⃣ Configuration Spotify OAuth
+
+    Aller sur : https://developer.spotify.com/dashboard
+
+    Créer une application
+
+    Ajouter cette redirect URI :
+
+http://127.0.0.1:8000/auth/callback
+
+    Récupérer :
+
+        CLIENT_ID
+
+        CLIENT_SECRET
+
+3️⃣ Créer le fichier .env
+
+SPOTIFY_CLIENT_ID=...
+SPOTIFY_CLIENT_SECRET=...
+SPOTIFY_REDIRECT_URI=http://127.0.0.1:8000/auth/callback
+
+🧩 Fonctionnalités déjà implémentées
+1️⃣ Authentification Spotify (OAuth)
+GET /auth/login
+
+Redirige vers Spotify pour demander :
+
+    accès au profil utilisateur
+
+    accès à la bibliothèque musicale
+
+GET /auth/callback
+
+Appelé automatiquement par Spotify :
+
+    échange du code → access_token
+
+    récupération du profil /me
+
+    sauvegarde du user en base (table spotify_users)
+
+⚠️ Ne jamais appeler ce endpoint manuellement depuis Swagger.
+2️⃣ Base de données
+
+SQLite + SQLModel
+Tables créées automatiquement au démarrage :
+
+    spotify_users
+
+    rooms
+
+    room_participants
+
+    votes
+
+3️⃣ Rooms (parties)
+POST /rooms
+
+Crée une nouvelle room :
+
+Params :
+
+    host_spotify_id
+
+    like_threshold
+
+La room contient :
+
+    un code unique (ex: DSCG8B)
+
+    un hôte
+
+    un seuil de likes
+
+    des participants
+
+L’hôte est ajouté automatiquement à la room.
+4️⃣ Participants
+POST /rooms/{code}/join?spotify_id=...
+
+Ajoute un utilisateur dans la room (s’il est connu dans spotify_users).
+GET /rooms/{code}/participants
+
+Liste les participants :
+
+    nom Spotify
+
+    email
+
+    date d’entrée
+
+5️⃣ Votes
+POST /rooms/{code}/vote?spotify_id=&track_uri=&is_like=
+
+Système complet de votes :
+
+    enregistre un vote
+
+    compte les “likes” pour la musique
+
+    compare avec le like_threshold
+
+Exemple de réponse :
+
+{
+  "status": "vote_registered",
+  "likes": 3,
+  "like_threshold": 4,
+  "play": false
+}
+
+Quand :
+
+likes >= like_threshold
+
+→ play = true
+→ l’hôte peut lancer la musique sur Spotify.
+🧪 Tester l’API
+
+Documentation interactive :
+
+👉 http://127.0.0.1:8000/docs
+
+Flow OAuth correct :
+
+    Aller sur GET /auth/login
+
+    Se connecter (ou accepter l'application)
+
+    Spotify renvoie automatiquement vers /auth/callback
+
+    Le backend affiche une réponse JSON avec le profil + tokens
+
+⚠️ Ne pas appeler /auth/callback manuellement depuis Swagger.
+▶️ Lancer le serveur
+
+uvicorn app.main:app --reload
+
+🔥 Ce qui est prêt
+
+✔ Auth Spotify
+✔ Stockage des utilisateurs
+✔ Rooms fonctionnelles
+✔ Join room
+✔ Votes + seuil
+✔ API propre & découpée
+✔ Base de données fonctionnelle
+📌 Prochaines étapes possibles
+
+    Rafraîchissement auto des tokens Spotify
+
+    Sélection aléatoire d’un morceau dans la playlist d’un joueur
+
+    WebSockets (votes / mise à jour en temps réel)
+
+    Intégration mobile (React Native / Flutter)
+
+    Lancement réel des musiques via Spotify Web Playback SDK
+
+✨ Auteur
+
+Projet scolaire Ynov – B2 Informatique
+Backend réalisé en Python + FastAPI

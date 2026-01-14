@@ -31,6 +31,7 @@ def get_current_user(access_token: str) -> dict:
 def get_user_playlists(access_token: str, limit: int = 20) -> dict:
     """
     Récupère les playlists de l'utilisateur connecté.
+    Pour l'instant, on ne gère pas la pagination avancée.
     """
     headers = {
         "Authorization": f"Bearer {access_token}"
@@ -73,6 +74,7 @@ def get_playlist_tracks(access_token: str, playlist_id: str, limit: int = 100) -
 def pick_random_track_from_user(access_token: str) -> dict:
     """
     Choisit une musique aléatoire dans les playlists de l'utilisateur.
+    Renvoie un dict avec les infos principales du morceau.
     """
     playlists_data = get_user_playlists(access_token)
 
@@ -96,7 +98,7 @@ def pick_random_track_from_user(access_token: str) -> dict:
     if not track:
         return {"error": "invalid_track_data"}
 
-    # Extraire les infos
+    # On extrait les infos utiles
     artists = ", ".join(a["name"] for a in track.get("artists", []))
 
     images = track.get("album", {}).get("images", [])
