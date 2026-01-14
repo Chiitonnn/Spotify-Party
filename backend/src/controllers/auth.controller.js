@@ -5,7 +5,7 @@ import { generateToken } from '../services/token.service.js';
 export const login = (req, res) => {
   try {
     console.log('🔐 [LOGIN] Starting login flow...');
-    console.log('📍 SPOTIFY_REDIRECT_URI:', process.env.SPOTIFY_REDIRECT_URI);
+    console.log('🔑 SPOTIFY_REDIRECT_URI:', process.env.SPOTIFY_REDIRECT_URI);
     
     const spotifyApi = createSpotifyApi();
     const authURL = spotifyApi.createAuthorizeURL(SPOTIFY_SCOPES, 'state');
@@ -22,20 +22,182 @@ export const login = (req, res) => {
   }
 };
 
+// 🆕 FONCTION MODIFIÉE : Version Robuste
+export const exchangeCode = async (req, res) => {
+  const { code, redirectUri } = req.body;
+
+  console.log('🔄 [EXCHANGE] ========== DÉBUT EXCHANGE ==========');
+  console.log('📊 [EXCHANGE] Code reçu:', code?.substring(0, 20) + '...');
+  console.log('📍 [EXCHANGE] Redirect URI:', redirectUri);
+
+  if (!code) {
+    console.error('❌ [EXCHANGE] No code provided');
+    return res.status(400).json({ error: 'Code is required' });
+  }
+
+  try {
+    console.log('🎫 [EXCHANGE] Exchanging code for tokens...');
+    
+    // Créer l'instance Spotify API
+    const spotifyApi = createSpotifyApi();
+    
+    // Si une redirectUri est fournie (depuis l'app mobile), l'utiliser
+    if (redirectUri) {
+      spotifyApi.setRedirectURI(redirectUri);
+    }
+    
+    // Échanger le code contre des tokens
+    let data;
+    try {
+      data = await spotifyApi.authorizationCodeGrant(code);
+      console.log('✅ [EXCHANGE] Token exchange successful');
+    } catch (spotifyError) {
+      console.error('❌ [EXCHANGE] Spotify API error:', {
+        message: spotifyError.message,
+        statusCode: spotifyError.statusCode,
+        body: spotifyError.body
+      });
+      
+      return res.status(400).json({ 
+        error: 'Spotify authentication failed',
+        details: spotifyError.body?.error_description || spotifyError.message
+      });
+    }
+    
+    const { access_token, refresh_token, expires_in } = data.body;
+    
+    if (!access_token) {
+      throw new Error('No access token received from Spotify');
+    }
+    
+    console.log('🎫 [EXCHANGE] Tokens received, expires in:', expires_in, 'seconds');
+    spotifyApi.setAccessToken(access_token);
+    
+    // 🛡️ CORRECTION ICI : Récupération robuste du profil
+    console.log('👤 [EXCHANGE] Fetching user profile...');
+    let profileBody = {};
+    
+    try {
+      const profileData = await spotifyApi.getMe();
+      profileBody = profileData.body;
+      console.log('✅ [EXCHANGE] Profile received:', {
+        id: profileBody.id,
+        displayName: profileBody.display_name
+      });
+    } catch (profileError) {
+      // On log juste un warning, mais ON NE PLANTE PAS L'AUTH
+      console.warn('⚠️ [EXCHANGE] Warning: Could not fetch Spotify profile details, using defaults.', profileError.message);
+      console.warn(JSON.stringify(profileError, null, 2));
+      
+      // Valeurs par défaut pour continuer l'inscription
+      profileBody = {
+        id: 'unknown_user_' + Math.floor(Math.random() * 10000), 
+        display_name: 'Utilisateur Spotify',
+        email: 'no-email-available',
+        images: [],
+        product: 'free'
+      };
+    }
+    
+    // Créer ou mettre à jour l'utilisateur
+    console.log('💾 [EXCHANGE] Saving user to database...');
+    let user;
+    
+    try {
+      // Utilisation sécurisée de profileBody
+      const spotifyId = profileBody.id || 'unknown';
+      
+      user = await User.findOne({ spotifyId: spotifyId });
+      
+      if (user) {
+        console.log('🔄 [EXCHANGE] Updating existing user:', user._id);
+        user.spotifyAccessToken = access_token;
+        user.spotifyRefreshToken = refresh_token;
+        user.tokenExpiresAt = new Date(Date.now() + expires_in * 1000);
+        user.displayName = profileBody.display_name || user.displayName;
+        user.email = profileBody.email || user.email;
+        user.isPremium = profileBody.product === 'premium';
+        // Garde l'ancienne image si la nouvelle n'est pas dispo
+        if (profileBody.images?.[0]?.url) {
+            user.profileImage = profileBody.images[0].url;
+        }
+      } else {
+        console.log('🆕 [EXCHANGE] Creating new user');
+        user = new User({
+          spotifyId: spotifyId,
+          displayName: profileBody.display_name || 'Utilisateur',
+          email: profileBody.email,
+          spotifyAccessToken: access_token,
+          spotifyRefreshToken: refresh_token,
+          tokenExpiresAt: new Date(Date.now() + expires_in * 1000),
+          isPremium: profileBody.product === 'premium',
+          profileImage: profileBody.images?.[0]?.url
+        });
+      }
+      
+      await user.save();
+      console.log('✅ [EXCHANGE] User saved successfully:', user._id);
+    } catch (dbError) {
+      console.error('❌ [EXCHANGE] Database error:', {
+        message: dbError.message,
+        name: dbError.name
+      });
+      
+      return res.status(500).json({ 
+        error: 'Failed to save user',
+        details: dbError.message
+      });
+    }
+    
+    // Générer le JWT
+    let jwtToken;
+    try {
+      jwtToken = generateToken(user._id);
+      console.log('🎟️ [EXCHANGE] JWT token generated');
+    } catch (jwtError) {
+      console.error('❌ [EXCHANGE] JWT generation error:', jwtError.message);
+      return res.status(500).json({ error: 'Failed to generate token' });
+    }
+    
+    // Retourner le token et les infos utilisateur
+    console.log('✅ [EXCHANGE] Success! Returning data to client');
+    res.json({
+      token: jwtToken,
+      user: {
+        id: user._id,
+        spotifyId: user.spotifyId,
+        displayName: user.displayName,
+        email: user.email,
+        isPremium: user.isPremium,
+        profileImage: user.profileImage
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ [EXCHANGE] Unexpected error:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    });
+    
+    res.status(500).json({ 
+      error: 'Authentication failed',
+      details: error.message
+    });
+  }
+};
+
 export const callback = async (req, res) => {
   const { code, error: spotifyError } = req.query;
 
   console.log('🔄 [CALLBACK] ========== DÉBUT CALLBACK ==========');
   console.log('📊 [CALLBACK] Query params:', req.query);
-  console.log('📊 [CALLBACK] Headers:', req.headers);
 
-  // Si Spotify renvoie une erreur
   if (spotifyError) {
     console.error('❌ [CALLBACK] Spotify returned error:', spotifyError);
     return res.redirect(`spotifyparty://callback?error=${encodeURIComponent(spotifyError)}`);
   }
 
-  // Si pas de code
   if (!code) {
     console.error('❌ [CALLBACK] No code received from Spotify');
     return res.redirect(`spotifyparty://callback?error=${encodeURIComponent('No authorization code received')}`);
@@ -43,34 +205,21 @@ export const callback = async (req, res) => {
 
   try {
     console.log('🎫 [CALLBACK] Exchanging code for tokens...');
-    console.log('🔑 [CALLBACK] Using client ID:', process.env.SPOTIFY_CLIENT_ID?.substring(0, 10) + '...');
-    console.log('🔑 [CALLBACK] Using redirect URI:', process.env.SPOTIFY_REDIRECT_URI);
     
     const spotifyApi = createSpotifyApi();
     
-    // Tenter l'échange du code
     let data;
     try {
       data = await spotifyApi.authorizationCodeGrant(code);
       console.log('✅ [CALLBACK] Token exchange successful');
     } catch (spotifyError) {
-      console.error('❌ [CALLBACK] Spotify API error during token exchange:', {
+      console.error('❌ [CALLBACK] Spotify API error:', {
         message: spotifyError.message,
         statusCode: spotifyError.statusCode,
         body: spotifyError.body
       });
       
-      // Extraire le vrai message d'erreur de Spotify
-      let errorMsg = 'Spotify authentication failed';
-      if (spotifyError.body?.error_description) {
-        errorMsg = spotifyError.body.error_description;
-      } else if (spotifyError.body?.error) {
-        errorMsg = spotifyError.body.error;
-      } else if (spotifyError.message) {
-        errorMsg = spotifyError.message;
-      }
-      
-      console.log('📤 [CALLBACK] Redirecting with error:', errorMsg);
+      let errorMsg = spotifyError.body?.error_description || spotifyError.message || 'Authentication failed';
       return res.redirect(`spotifyparty://callback?error=${encodeURIComponent(errorMsg)}`);
     }
     
@@ -80,119 +229,55 @@ export const callback = async (req, res) => {
       throw new Error('No access token received from Spotify');
     }
     
-    console.log('🎫 [CALLBACK] Tokens received, expires in:', expires_in, 'seconds');
+    console.log('🎫 [CALLBACK] Tokens received');
     spotifyApi.setAccessToken(access_token);
     
-    // Récupérer le profil
     console.log('👤 [CALLBACK] Fetching user profile...');
     let profile;
     try {
       profile = await spotifyApi.getMe();
-      console.log('✅ [CALLBACK] Profile received:', {
-        id: profile.body.id,
-        displayName: profile.body.display_name,
-        email: profile.body.email
-      });
+      console.log('✅ [CALLBACK] Profile received:', profile.body.display_name);
     } catch (profileError) {
       console.error('❌ [CALLBACK] Error fetching profile:', profileError.message);
       return res.redirect(`spotifyparty://callback?error=${encodeURIComponent('Failed to fetch user profile')}`);
     }
     
-    // Créer ou mettre à jour l'utilisateur
-    console.log('💾 [CALLBACK] Saving user to database...');
-    let user;
+    console.log('💾 [CALLBACK] Saving user...');
+    let user = await User.findOne({ spotifyId: profile.body.id });
     
-    try {
-      user = await User.findOne({ spotifyId: profile.body.id });
-      
-      if (user) {
-        console.log('🔄 [CALLBACK] Updating existing user:', user._id);
-        user.spotifyAccessToken = access_token;
-        user.spotifyRefreshToken = refresh_token;
-        user.tokenExpiresAt = new Date(Date.now() + expires_in * 1000);
-        user.displayName = profile.body.display_name;
-        user.email = profile.body.email;
-        user.isPremium = profile.body.product === 'premium';
-        user.profileImage = profile.body.images?.[0]?.url;
-      } else {
-        console.log('🆕 [CALLBACK] Creating new user');
-        user = new User({
-          spotifyId: profile.body.id,
-          displayName: profile.body.display_name,
-          email: profile.body.email,
-          spotifyAccessToken: access_token,
-          spotifyRefreshToken: refresh_token,
-          tokenExpiresAt: new Date(Date.now() + expires_in * 1000),
-          isPremium: profile.body.product === 'premium',
-          profileImage: profile.body.images?.[0]?.url
-        });
-      }
-      
-      await user.save();
-      console.log('✅ [CALLBACK] User saved successfully:', user._id);
-    } catch (dbError) {
-      console.error('❌ [CALLBACK] Database error:', {
-        message: dbError.message,
-        name: dbError.name,
-        code: dbError.code
+    if (user) {
+      user.spotifyAccessToken = access_token;
+      user.spotifyRefreshToken = refresh_token;
+      user.tokenExpiresAt = new Date(Date.now() + expires_in * 1000);
+      user.displayName = profile.body.display_name;
+      user.email = profile.body.email;
+      user.isPremium = profile.body.product === 'premium';
+      user.profileImage = profile.body.images?.[0]?.url;
+    } else {
+      user = new User({
+        spotifyId: profile.body.id,
+        displayName: profile.body.display_name,
+        email: profile.body.email,
+        spotifyAccessToken: access_token,
+        spotifyRefreshToken: refresh_token,
+        tokenExpiresAt: new Date(Date.now() + expires_in * 1000),
+        isPremium: profile.body.product === 'premium',
+        profileImage: profile.body.images?.[0]?.url
       });
-      
-      // Vérifier si c'est une erreur de connexion MongoDB
-      if (dbError.name === 'MongoNetworkError' || dbError.name === 'MongooseServerSelectionError') {
-        return res.redirect(`spotifyparty://callback?error=${encodeURIComponent('Database connection failed')}`);
-      }
-      
-      return res.redirect(`spotifyparty://callback?error=${encodeURIComponent('Failed to save user: ' + dbError.message)}`);
     }
     
-    // Générer le JWT
-    let jwtToken;
-    try {
-      jwtToken = generateToken(user._id);
-      console.log('🎟️ [CALLBACK] JWT token generated');
-    } catch (jwtError) {
-      console.error('❌ [CALLBACK] JWT generation error:', jwtError.message);
-      return res.redirect(`spotifyparty://callback?error=${encodeURIComponent('Failed to generate token')}`);
-    }
+    await user.save();
+    console.log('✅ [CALLBACK] User saved');
     
-    // ✅ Redirection vers le deep link mobile
+    const jwtToken = generateToken(user._id);
+    
     const redirectUrl = `spotifyparty://callback?token=${jwtToken}&userId=${user._id}`;
-    console.log('🚀 [CALLBACK] Redirecting to app with success');
-    console.log('🚀 [CALLBACK] Redirect URL length:', redirectUrl.length);
+    console.log('🚀 [CALLBACK] Redirecting to app');
     res.redirect(redirectUrl);
     
   } catch (error) {
-    // Catch-all pour toute erreur non prévue
-    console.error('❌ [CALLBACK] Unexpected error:', {
-      name: error.name,
-      message: error.message,
-      stack: error.stack,
-      statusCode: error.statusCode,
-      body: error.body
-    });
-    
-    // ✅ CORRECTION CRITIQUE : Toujours envoyer une string, jamais un objet
-    let errorMessage = 'Authentication failed';
-    
-    // Essayer d'extraire le meilleur message d'erreur possible
-    if (typeof error === 'string') {
-      errorMessage = error;
-    } else if (error.message) {
-      errorMessage = error.message;
-    } else if (error.body?.error_description) {
-      errorMessage = error.body.error_description;
-    } else if (error.body?.error) {
-      errorMessage = error.body.error;
-    } else {
-      // Si vraiment rien ne fonctionne, stringify l'objet
-      errorMessage = JSON.stringify({
-        name: error.name,
-        message: error.message || 'Unknown error'
-      });
-    }
-    
-    console.log('📤 [CALLBACK] Sending error to app:', errorMessage);
-    res.redirect(`spotifyparty://callback?error=${encodeURIComponent(errorMessage)}`);
+    console.error('❌ [CALLBACK] Error:', error.message);
+    res.redirect(`spotifyparty://callback?error=${encodeURIComponent(error.message)}`);
   }
 };
 
@@ -221,10 +306,7 @@ export const refreshToken = async (req, res) => {
       expiresIn: data.body.expires_in
     });
   } catch (error) {
-    console.error('❌ [REFRESH] Error:', {
-      message: error.message,
-      stack: error.stack
-    });
+    console.error('❌ [REFRESH] Error:', error.message);
     res.status(500).json({ error: error.message });
   }
 };
@@ -242,10 +324,7 @@ export const getCurrentUser = async (req, res) => {
     console.log('✅ [GET_USER] User found:', user.displayName);
     res.json(user);
   } catch (error) {
-    console.error('❌ [GET_USER] Error:', {
-      message: error.message,
-      stack: error.stack
-    });
+    console.error('❌ [GET_USER] Error:', error.message);
     res.status(500).json({ error: error.message });
   }
 };

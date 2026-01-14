@@ -19,6 +19,9 @@ const CreateSessionScreen = ({ navigation }) => {
   const { setCurrentSession } = useSession();
   const [sessionName, setSessionName] = useState('Ma Session');
   const [votingThreshold, setVotingThreshold] = useState('5');
+  // 🆕 Nouveau champ pour la limite
+  const [trackLimit, setTrackLimit] = useState('20');
+  
   const [playlists, setPlaylists] = useState([]);
   const [selectedPlaylists, setSelectedPlaylists] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -47,11 +50,6 @@ const CreateSessionScreen = ({ navigation }) => {
   };
 
   const handleCreate = async () => {
-    if (!user.isPremium) {
-      Alert.alert('Premium requis', 'Vous devez avoir Spotify Premium pour être hôte');
-      return;
-    }
-
     if (selectedPlaylists.length === 0) {
       Alert.alert('Erreur', 'Sélectionnez au moins une playlist');
       return;
@@ -62,12 +60,14 @@ const CreateSessionScreen = ({ navigation }) => {
       const session = await SessionService.createSession({
         name: sessionName,
         playlistIds: selectedPlaylists,
-        votingThreshold: parseInt(votingThreshold)
+        votingThreshold: parseInt(votingThreshold),
+        trackLimit: parseInt(trackLimit) // 👈 On envoie la limite au backend
       });
 
       setCurrentSession(session);
       navigation.replace('Session', { sessionId: session._id });
     } catch (error) {
+      console.error(error);
       Alert.alert('Erreur', 'Impossible de créer la session');
     } finally {
       setLoading(false);
@@ -94,15 +94,30 @@ const CreateSessionScreen = ({ navigation }) => {
           placeholderTextColor="#666"
         />
 
-        <Text style={styles.label}>Votes requis pour lancer</Text>
-        <TextInput
-          style={styles.input}
-          value={votingThreshold}
-          onChangeText={setVotingThreshold}
-          keyboardType="numeric"
-          placeholder="5"
-          placeholderTextColor="#666"
-        />
+        <View style={{flexDirection: 'row', gap: 10}}>
+          <View style={{flex: 1}}>
+            <Text style={styles.label}>Votes requis</Text>
+            <TextInput
+              style={styles.input}
+              value={votingThreshold}
+              onChangeText={setVotingThreshold}
+              keyboardType="numeric"
+              placeholder="5"
+              placeholderTextColor="#666"
+            />
+          </View>
+          <View style={{flex: 1}}>
+            <Text style={styles.label}>Nbr Musiques</Text>
+            <TextInput
+              style={styles.input}
+              value={trackLimit}
+              onChangeText={setTrackLimit}
+              keyboardType="numeric"
+              placeholder="20"
+              placeholderTextColor="#666"
+            />
+          </View>
+        </View>
 
         <Text style={styles.label}>Sélectionnez vos playlists</Text>
       </View>
@@ -139,69 +154,18 @@ const CreateSessionScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#000'
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#000'
-  },
-  form: {
-    padding: 20
-  },
-  label: {
-    color: '#FFF',
-    fontSize: 16,
-    marginBottom: 10,
-    marginTop: 10
-  },
-  input: {
-    backgroundColor: '#282828',
-    color: '#FFF',
-    padding: 15,
-    borderRadius: 10,
-    fontSize: 16
-  },
-  list: {
-    flex: 1,
-    paddingHorizontal: 20
-  },
-  playlistItem: {
-    backgroundColor: '#282828',
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 10
-  },
-  playlistSelected: {
-    backgroundColor: '#1DB954',
-    borderWidth: 2,
-    borderColor: '#FFF'
-  },
-  playlistName: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: 'bold'
-  },
-  playlistTracks: {
-    color: '#B3B3B3',
-    fontSize: 12,
-    marginTop: 5
-  },
-  createButton: {
-    backgroundColor: '#1DB954',
-    margin: 20,
-    padding: 18,
-    borderRadius: 25,
-    alignItems: 'center'
-  },
-  createButtonText: {
-    color: '#FFF',
-    fontSize: 18,
-    fontWeight: 'bold'
-  }
+  container: { flex: 1, backgroundColor: '#000' },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' },
+  form: { padding: 20 },
+  label: { color: '#FFF', fontSize: 16, marginBottom: 10, marginTop: 10 },
+  input: { backgroundColor: '#282828', color: '#FFF', padding: 15, borderRadius: 10, fontSize: 16 },
+  list: { flex: 1, paddingHorizontal: 20 },
+  playlistItem: { backgroundColor: '#282828', padding: 15, borderRadius: 10, marginBottom: 10 },
+  playlistSelected: { backgroundColor: '#1DB954', borderWidth: 2, borderColor: '#FFF' },
+  playlistName: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
+  playlistTracks: { color: '#B3B3B3', fontSize: 12, marginTop: 5 },
+  createButton: { backgroundColor: '#1DB954', margin: 20, padding: 18, borderRadius: 25, alignItems: 'center' },
+  createButtonText: { color: '#FFF', fontSize: 18, fontWeight: 'bold' }
 });
 
 export default CreateSessionScreen;

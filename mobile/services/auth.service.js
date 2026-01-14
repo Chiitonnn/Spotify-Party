@@ -1,117 +1,155 @@
+import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 import api from '../config/api';
 
-const BACKEND_URL = 'https://spotify-party.onrender.com';
-const REDIRECT_URI = 'spotifyparty://callback';
-
+// Important : permet au navigateur de se fermer automatiquement après l'auth
 WebBrowser.maybeCompleteAuthSession();
 
+const SPOTIFY_CLIENT_ID = '3e79328c5f814b52a27d64e50a140404';
+
 /**
- * Ouvre l'authentification Spotify dans un navigateur
+ * Authentification avec Spotify via AuthSession
  */
 export const openSpotifyAuth = async () => {
   try {
-    console.log('🔐 Démarrage de l\'authentification Spotify...');
+    console.log('🔐 Démarrage authentification Spotify...');
+
+    // 1. Créer la redirect URI avec un scheme personnalisé
+    // Important : utiliser le même scheme que dans app.json
+    const redirectUri = AuthSession.makeRedirectUri({
+      scheme: 'spotifyparty',
+      path: 'callback',
+      preferLocalhost: false,
+      useProxy: false,
+    });
     
-    // 1. Récupérer l'URL d'authentification depuis le backend
-    console.log('📡 Appel de /auth/login sur:', api.defaults.baseURL);
-    const response = await api.get('/auth/login');
-    const authUrl = response.data.authUrl;
-    
-    console.log('🌐 URL d\'auth reçue:', authUrl);
-    console.log('📊 Réponse complète:', response.data);
+    console.log('📍 Redirect URI générée:', redirectUri);
+    console.log('📱 Platform:', Platform.OS);
 
-    // 2. Ouvrir le navigateur avec l'URL Spotify
-    const result = await WebBrowser.openAuthSessionAsync(
-      authUrl,
-      REDIRECT_URI
-    );
+    // 2. Configuration de l'endpoint Spotify
+    const discovery = {
+      authorizationEndpoint: 'https://accounts.spotify.com/authorize',
+      tokenEndpoint: 'https://accounts.spotify.com/api/token',
+    };
 
-    console.log('📱 Résultat du navigateur:', result);
+    // 3. Scopes nécessaires
+    const scopes = [
+      'user-read-private',
+      'user-read-email',
+      'playlist-read-private',
+      'user-modify-playback-state',
+      'user-read-playback-state',
+      'streaming'
+    ];
 
-    // 3. Gérer le résultat
-    if (result.type === 'success' && result.url) {
-      return await handleAuthCallback(result.url);
-    } else if (result.type === 'cancel') {
-      throw new Error('Authentification annulée');
-    } else {
-      throw new Error('Authentification échouée');
-    }
-  } catch (error) {
-    // CORRIGÉ : Logging d'erreur approprié avec tous les détails
-    console.error('❌ Erreur d\'auth complète:', JSON.stringify({
-      message: error.message,
-      name: error.name,
-      stack: error.stack,
-      responseData: error.response?.data,
-      responseStatus: error.response?.status,
-      responseHeaders: error.response?.headers,
-      requestUrl: error.config?.url,
-      isAxiosError: error.isAxiosError
-    }, null, 2));
-    throw error;
-  }
-};
+    // 4. Créer la requête d'autorisation
+    const authRequest = new AuthSession.AuthRequest({
+      clientId: SPOTIFY_CLIENT_ID,
+      scopes: scopes,
+      redirectUri: redirectUri,
+      responseType: AuthSession.ResponseType.Code,
+      usePKCE: false,
+      // Paramètres supplémentaires pour améliorer la stabilité
+      state: Math.random().toString(36).substring(7),
 
-/**
- * Traite l'URL de callback après authentification
- */
-export const handleAuthCallback = async (url) => {
-  try {
-    console.log('📱 ======= DÉBUT CALLBACK =======');
-    console.log('📱 URL complète reçue:', url);
-
-    // Vérifier s'il y a une erreur dans l'URL
-    if (url.includes('error=')) {
-      const errorMatch = url.match(/error=([^&]+)/);
-      const encodedError = errorMatch ? errorMatch[1] : 'unknown';
-      const decodedError = decodeURIComponent(encodedError);
-      
-      console.log('❌ Erreur détectée dans l\'URL:');
-      console.log('  - Encodée:', encodedError);
-      console.log('  - Décodée:', decodedError);
-      
-      throw new Error(`Erreur backend: ${decodedError}`);
-    }
-
-    // Extraire les paramètres de l'URL
-    const urlParts = url.split('?');
-    if (urlParts.length < 2) {
-      throw new Error('Format d\'URL de callback invalide');
-    }
-
-    const params = new URLSearchParams(urlParts[1]);
-    const token = params.get('token');
-    const userId = params.get('userId');
-
-    console.log('🔍 Paramètres extraits:', { 
-      hasToken: !!token, 
-      hasUserId: !!userId,
-      tokenLength: token?.length,
-      allParams: Object.fromEntries(params)
+      extraParams: {
+        show_dialog: 'true'
+      }
     });
 
-    if (!token) {
-      throw new Error('Pas de token dans l\'URL de callback');
-    }
+    console.log('🔧 Configuration de la requête:', {
+      clientId: SPOTIFY_CLIENT_ID.substring(0, 10) + '...',
+      redirectUri,
+      scopes: scopes.length + ' scopes'
+    });
 
-    // Sauvegarder le token dans AsyncStorage
-    await AsyncStorage.setItem('token', token);
+    // 5. Ouvrir le navigateur pour l'authentification Spotify
+    console.log('🌐 Ouverture du navigateur Spotify...');
     
-    if (userId) {
-      await AsyncStorage.setItem('user_id', userId);
+    const result = await authRequest.promptAsync(discovery, {
+      // useProxy: false est important pour iOS avec custom scheme
+      useProxy: false,
+      showInRecents: true,
+      // Garder le navigateur ouvert même si l'app passe en arrière-plan
+      createTask: Platform.OS === 'android',
+    });
+
+    console.log('📱 Résultat du navigateur:', result.type);
+
+    // 6. Traiter le résultat
+    if (result.type === 'success') {
+      const { code } = result.params;
+      
+      if (!code) {
+        throw new Error('Aucun code reçu de Spotify');
+      }
+      
+      console.log('✅ Code OAuth reçu');
+      console.log('🔄 Échange du code via le backend...');
+
+      try {
+        // 7. Échanger le code contre un token via notre backend
+        const response = await api.post('/auth/exchange', {
+          code,
+          redirectUri
+        });
+
+        console.log('🎟️ Token JWT reçu du backend');
+        
+        // 8. Sauvegarder les données localement
+        await AsyncStorage.setItem('token', response.data.token);
+        await AsyncStorage.setItem('user', JSON.stringify(response.data.user));
+        
+        console.log('✅ Authentification réussie!');
+        console.log('👤 Utilisateur:', response.data.user.displayName);
+        
+        return {
+          token: response.data.token,
+          userId: response.data.user.id,
+          user: response.data.user
+        };
+      } catch (exchangeError) {
+        console.error('❌ Erreur lors de l\'échange du code:', {
+          message: exchangeError.message,
+          response: exchangeError.response?.data
+        });
+        throw new Error(
+          exchangeError.response?.data?.details || 
+          exchangeError.response?.data?.error || 
+          'Échec de l\'échange du code d\'autorisation'
+        );
+      }
+    } 
+    
+    if (result.type === 'cancel') {
+      console.log('⚠️ Authentification annulée par l\'utilisateur');
+      throw new Error('Authentification annulée');
     }
+    
+    if (result.type === 'dismiss') {
+      console.log('⚠️ Navigateur fermé par l\'utilisateur');
+      throw new Error('Authentification annulée');
+    }
+    
+    if (result.type === 'error') {
+      console.error('❌ Erreur AuthSession:', result.error);
+      throw new Error(result.error?.message || 'Erreur d\'authentification');
+    }
+    
+    if (result.type === 'locked') {
+      console.log('⚠️ Authentification déjà en cours');
+      throw new Error('Une authentification est déjà en cours');
+    }
+    
+    throw new Error(`Résultat d'authentification inattendu: ${result.type}`);
 
-    console.log('✅ Token sauvegardé avec succès');
-
-    return { token, userId };
   } catch (error) {
-    // CORRIGÉ : Logging d'erreur approprié
-    console.error('❌ Erreur de callback:', {
+    console.error('❌ Erreur complète d\'authentification:', {
       message: error.message,
-      stack: error.stack,
-      url: url
+      name: error.name,
+      stack: error.stack?.split('\n').slice(0, 3).join('\n')
     });
     throw error;
   }
@@ -125,11 +163,7 @@ export const getCurrentUser = async () => {
     const response = await api.get('/auth/me');
     return response.data;
   } catch (error) {
-    console.error('❌ Erreur lors de la récupération de l\'utilisateur:', {
-      message: error.message,
-      response: error.response?.data,
-      status: error.response?.status
-    });
+    console.error('❌ Erreur récupération utilisateur:', error.message);
     throw error;
   }
 };
@@ -142,11 +176,7 @@ export const refreshToken = async () => {
     const response = await api.post('/auth/refresh');
     return response.data;
   } catch (error) {
-    console.error('❌ Erreur lors du rafraîchissement du token:', {
-      message: error.message,
-      response: error.response?.data,
-      status: error.response?.status
-    });
+    console.error('❌ Erreur rafraîchissement token:', error.message);
     throw error;
   }
 };
@@ -159,7 +189,20 @@ export const getStoredToken = async () => {
     const token = await AsyncStorage.getItem('token');
     return token;
   } catch (error) {
-    console.error('❌ Erreur lors de la récupération du token:', error.message);
+    console.error('❌ Erreur récupération token:', error.message);
+    return null;
+  }
+};
+
+/**
+ * Récupère l'utilisateur stocké localement
+ */
+export const getStoredUser = async () => {
+  try {
+    const userStr = await AsyncStorage.getItem('user');
+    return userStr ? JSON.parse(userStr) : null;
+  } catch (error) {
+    console.error('❌ Erreur récupération utilisateur local:', error.message);
     return null;
   }
 };
@@ -174,7 +217,7 @@ export const logout = async () => {
     await AsyncStorage.removeItem('user');
     console.log('✅ Déconnexion réussie');
   } catch (error) {
-    console.error('❌ Erreur lors de la déconnexion:', error.message);
+    console.error('❌ Erreur déconnexion:', error.message);
     throw error;
   }
 };
@@ -187,17 +230,17 @@ export const isAuthenticated = async () => {
     const token = await AsyncStorage.getItem('token');
     return !!token;
   } catch (error) {
-    console.error('❌ Erreur lors de la vérification de l\'authentification:', error.message);
+    console.error('❌ Erreur vérification auth:', error.message);
     return false;
   }
 };
 
 export default {
   openSpotifyAuth,
-  handleAuthCallback,
   getCurrentUser,
   refreshToken,
   getStoredToken,
+  getStoredUser,
   logout,
   isAuthenticated
 };

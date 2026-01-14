@@ -17,3 +17,8 @@ export const getSessionResults = async (sessionId) => {
   const response = await api.get(`/votes/${sessionId}/results`);
   return response.data;
 };
+
+export const getUserVotes = async (sessionId) => {
+  const response = await api.get(`/votes/session/${sessionId}/my-votes`);
+  return response.data; // Renvoie un tableau d'IDs ['track1', 'track2'...]
+};

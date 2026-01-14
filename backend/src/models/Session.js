@@ -12,11 +12,28 @@ const sessionSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+
   name: {
     type: String,
     default: 'Spotify Party'
   },
+
   playlistIds: [String],
+
+  trackLimit: { 
+    type: Number, 
+    default: 20 
+  },
+
+  trackPool: [{
+    id: String,
+    name: String,
+    uri: String,
+    artists: [String],
+    albumImage: String,
+    preview_url: String
+  }],
+
   participants: [{
     userId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -27,20 +44,15 @@ const sessionSchema = new mongoose.Schema({
       default: Date.now
     }
   }],
-  currentTrack: {
+
+  // 🆕 NOUVEAU : La file d'attente des musiques validées
+  approvedQueue: [{
     trackId: String,
-    trackName: String,
+    uri: String, // Vital pour la lecture
+    name: String,
     artists: [String],
     albumImage: String,
-    uri: String
-  },
-  trackQueue: [{
-    trackId: String,
-    trackName: String,
-    artists: [String],
-    albumImage: String,
-    uri: String,
-    addedBy: mongoose.Schema.Types.ObjectId
+    addedAt: { type: Date, default: Date.now }
   }],
   votingThreshold: {
     type: Number,
@@ -50,6 +62,8 @@ const sessionSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   }
+
+  
 }, {
   timestamps: true
 });

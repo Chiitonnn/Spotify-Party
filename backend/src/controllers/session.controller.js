@@ -2,16 +2,57 @@ import Session from '../models/Session.js';
 import User from '../models/User.js';
 import shortid from 'shortid';
 import { getIO } from '../services/websocket.service.js';
+import { createSpotifyApi } from '../config/spotify.js';
 
 export const createSession = async (req, res) => {
   try {
-    const { name, playlistIds, votingThreshold } = req.body;
+    // On récupère trackLimit du front
+    const { name, playlistIds, votingThreshold, trackLimit } = req.body;
     const user = await User.findById(req.userId);
     
     if (!user.isPremium) {
       return res.status(403).json({ error: 'Premium required to host' });
     }
-    
+
+    // 1. Récupérer TOUTES les musiques des playlists sélectionnées
+    const spotifyApi = createSpotifyApi(user.spotifyAccessToken);
+    let allTracks = [];
+
+    // Pour chaque playlist, on récupère les sons (limité aux 50 premiers pour aller vite)
+    for (const pid of playlistIds) {
+      try {
+        const data = await spotifyApi.getPlaylistTracks(pid, { limit: 50, market: 'FR' });
+        const cleanTracks = data.body.items
+          .filter(item => item.track && item.track.id) // Enlever les nulls
+          .map(item => ({
+            id: item.track.id,
+            name: item.track.name,
+            uri: item.track.uri,
+            artists: item.track.artists.map(a => a.name),
+            albumImage: item.track.album.images?.[0]?.url || 'https://via.placeholder.com/300',
+            // On gère la preview ici directement
+            preview_url: item.track.preview_url 
+              ? item.track.preview_url 
+              : 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3'
+          }));
+        allTracks = [...allTracks, ...cleanTracks];
+      } catch (err) {
+        console.error(`Erreur playlist ${pid}:`, err.message);
+      }
+    }
+
+    // 2. MÉLANGE (SHUFFLE) 🎲
+    // Algorithme de Fisher-Yates pour bien mélanger
+    for (let i = allTracks.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [allTracks[i], allTracks[j]] = [allTracks[j], allTracks[i]];
+    }
+
+    // 3. LIMITER (SLICE) ✂️
+    // On garde uniquement le nombre demandé (ex: 10)
+    const limit = parseInt(trackLimit) || 20;
+    const finalPool = allTracks.slice(0, limit);
+
     const code = shortid.generate().toUpperCase().substring(0, 6);
     
     const session = new Session({
@@ -20,6 +61,8 @@ export const createSession = async (req, res) => {
       name: name || 'Spotify Party',
       playlistIds: playlistIds || [],
       votingThreshold: votingThreshold || 5,
+      trackLimit: limit,
+      trackPool: finalPool, // 💾 On sauvegarde la sélection !
       participants: [{
         userId: req.userId,
         joinedAt: new Date()
@@ -32,6 +75,7 @@ export const createSession = async (req, res) => {
     
     res.status(201).json(session);
   } catch (error) {
+    console.error('Create Session Error:', error);
     res.status(500).json({ error: error.message });
   }
 };
@@ -160,6 +204,53 @@ export const updateVotingThreshold = async (req, res) => {
     
     res.json(session);
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export const startParty = async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const session = await Session.findById(sessionId);
+    const user = await User.findById(req.userId); // L'hôte
+
+    if (!session) return res.status(404).json({ error: 'Session not found' });
+    if (session.hostId.toString() !== req.userId) {
+      return res.status(403).json({ error: 'Seul l\'hôte peut lancer la soirée' });
+    }
+    if (!session.approvedQueue || session.approvedQueue.length === 0) {
+      return res.status(400).json({ error: 'Aucune musique n\'a été votée !' });
+    }
+
+    // 1. Préparer l'API Spotify de l'hôte
+    const spotifyApi = createSpotifyApi(user.spotifyAccessToken);
+
+    // 2. Trouver l'appareil actif (Logique "Smartphone First")
+    const devicesData = await spotifyApi.getMyDevices();
+    const devices = devicesData.body.devices;
+    
+    const targetDevice = devices.find(d => d.type === 'Smartphone') 
+                      || devices.find(d => d.is_active) 
+                      || devices[0];
+
+    if (!targetDevice) {
+      return res.status(404).json({ error: 'Aucun appareil Spotify trouvé. Ouvrez Spotify !' });
+    }
+
+    // 3. Récupérer les URIs des musiques validées
+    const uris = session.approvedQueue.map(track => track.uri);
+
+    // 4. Lancer la lecture de la LISTE ENTIÈRE
+    console.log(`🚀 Lancement soirée sur ${targetDevice.name} avec ${uris.length} titres`);
+    await spotifyApi.play({ 
+      uris: uris, 
+      device_id: targetDevice.id 
+    });
+
+    res.json({ message: 'Party started!', count: uris.length });
+
+  } catch (error) {
+    console.error('❌ Start Party Error:', error);
     res.status(500).json({ error: error.message });
   }
 };

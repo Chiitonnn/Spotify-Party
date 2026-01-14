@@ -29,3 +29,8 @@ export const updateVotingThreshold = async (sessionId, threshold) => {
   const response = await api.patch(`/sessions/${sessionId}/threshold`, { threshold });
   return response.data;
 };
+
+export const startParty = async (sessionId) => {
+  const response = await api.post(`/sessions/${sessionId}/start`);
+  return response.data;
+};

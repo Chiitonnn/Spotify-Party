@@ -5,7 +5,8 @@ import {
   getSession,
   leaveSession,
   closeSession,
-  updateVotingThreshold
+  updateVotingThreshold,
+  startParty
 } from '../controllers/session.controller.js';
 import { authenticate } from '../middleware/auth.middleware.js';
 
@@ -17,5 +18,6 @@ router.get('/:sessionId', authenticate, getSession);
 router.post('/:sessionId/leave', authenticate, leaveSession);
 router.post('/:sessionId/close', authenticate, closeSession);
 router.patch('/:sessionId/threshold', authenticate, updateVotingThreshold);
+router.post('/:sessionId/start', authenticate, startParty);
 
 export default router;

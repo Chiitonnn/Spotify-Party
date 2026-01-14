@@ -50,8 +50,10 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 3000;
 
 connectDB().then(() => {
-  server.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
+  // ⚠️ CHANGEMENT ICI : Ajoutez '0.0.0.0' pour écouter sur toutes les interfaces
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Server running on http://0.0.0.0:${PORT}`);
     console.log(`📡 WebSocket enabled`);
+    console.log(`🌐 Accessible via: http://172.20.10.7:${PORT}`);
   });
 });

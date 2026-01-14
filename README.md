@@ -24,6 +24,8 @@
 
     npx expo install expo-web-browse
 
+    npx expo install expo-av
+
     npx expo start --clear
 
     a

@@ -19,3 +19,9 @@ export const getTrack = async (trackId) => {
   const response = await api.get(`/spotify/tracks/${trackId}`);
   return response.data;
 };
+
+// 👇 AJOUT ICI
+export const playTrack = async (uri) => {
+  const response = await api.put('/spotify/play', { uri });
+  return response.data;
+};
