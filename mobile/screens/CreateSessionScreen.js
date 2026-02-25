@@ -7,7 +7,11 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
-  StatusBar
+  StatusBar,
+  SafeAreaView,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSession } from '../contexts/SessionContext';
@@ -17,29 +21,23 @@ const CreateSessionScreen = ({ navigation }) => {
   const { setCurrentSession } = useSession();
   const [sessionName, setSessionName] = useState('Spotify Party');
   const [loading, setLoading] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
 
   const handleCreate = async () => {
     if (!sessionName.trim()) {
-      Alert.alert('Attention', 'Donnez un nom à votre soirée.');
+      Alert.alert('Oups', 'Le nom de la session ne peut pas être vide.');
       return;
     }
-
     try {
       setLoading(true);
-      
-      // On envoie des valeurs par défaut pour satisfaire l'ancien backend
       const session = await SessionService.createSession({
         name: sessionName,
-        playlistIds: [], // Plus besoin de playlists !
-        votingThreshold: 1, // On s'en fiche maintenant
-        trackLimit: 50 // Pareil
+        playlistIds: [], votingThreshold: 1, trackLimit: 50 
       });
-
       setCurrentSession(session);
       navigation.replace('Session', { sessionId: session._id });
     } catch (error) {
-      console.error(error);
-      Alert.alert('Erreur', 'Impossible de créer la session.');
+      Alert.alert('Erreur', 'Impossible de générer le salon.');
     } finally {
       setLoading(false);
     }
@@ -48,114 +46,108 @@ const CreateSessionScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
-      
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={24} color="#FFF" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Nouvelle Session</Text>
-        <View style={{width: 24}} /> 
-      </View>
-
-      <View style={styles.content}>
-        <View style={styles.iconContainer}>
-          <Ionicons name="radio" size={60} color="#1DB954" />
-        </View>
-
-        <Text style={styles.title}>Créez votre salon</Text>
-        <Text style={styles.subtitle}>
-          Vos invités pourront rejoindre avec un code et ajouter leurs sons.
-        </Text>
-
-        <View style={styles.form}>
-          <Text style={styles.label}>Nom de la soirée</Text>
-          <TextInput
-            style={styles.input}
-            value={sessionName}
-            onChangeText={setSessionName}
-            placeholder="Ex: Soirée de Titouan"
-            placeholderTextColor="#666"
-            autoFocus={true}
-            selectionColor="#1DB954"
-          />
-        </View>
-      </View>
-
-      <View style={styles.footer}>
-        <TouchableOpacity
-          style={styles.createButton}
-          onPress={handleCreate}
-          disabled={loading}
+      <SafeAreaView style={styles.safeArea}>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
         >
-          {loading ? (
-             <ActivityIndicator color="#000" />
-          ) : (
-            <Text style={styles.createButtonText}>CRÉER LE SALON</Text>
-          )}
-        </TouchableOpacity>
-      </View>
+          <ScrollView contentContainerStyle={styles.scrollContent} bounces={false}>
+            <View style={styles.header}>
+              <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+                <Ionicons name="arrow-back" size={26} color="#FFF" />
+              </TouchableOpacity>
+              <Text style={styles.headerTitle}>CRÉER</Text>
+              <View style={{ width: 40 }} />
+            </View>
+
+            <View style={styles.hero}>
+              <View style={styles.iconGlow}>
+                <View style={styles.iconCircle}>
+                  <Ionicons name="musical-note" size={40} color="#1DB954" />
+                </View>
+              </View>
+              <Text style={styles.title}>Lancez le mouvement</Text>
+              <Text style={styles.subtitle}>
+                Un espace partagé où chaque invité peut enrichir la file d'attente.
+              </Text>
+            </View>
+
+            <View style={styles.form}>
+              <Text style={styles.inputLabel}>NOM DE LA SOIRÉE</Text>
+              <View style={[styles.inputContainer, isFocused && styles.inputContainerFocused]}>
+                <TextInput
+                  style={styles.input}
+                  value={sessionName}
+                  onChangeText={setSessionName}
+                  onFocus={() => setIsFocused(true)}
+                  onBlur={() => setIsFocused(false)}
+                  placeholderTextColor="#444"
+                  selectionColor="#1DB954"
+                />
+              </View>
+            </View>
+
+            <View style={styles.card}>
+              <View style={styles.cardIcon}>
+                <Ionicons name="flash-sharp" size={20} color="#1DB954" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.cardTitle}>Le saviez-vous ?</Text>
+                <Text style={styles.cardText}>
+                  Une fois créée, partagez simplement le code à 6 chiffres. Vos amis rejoignent en un clic.
+                </Text>
+              </View>
+            </View>
+          </ScrollView>
+
+          <View style={styles.footer}>
+            <TouchableOpacity
+              style={[styles.mainButton, loading && styles.buttonDisabled]}
+              onPress={handleCreate}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#000" />
+              ) : (
+                <Text style={styles.mainButtonText}>CRÉER LA SESSION</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000', paddingTop: 40 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    marginBottom: 40
-  },
-  headerTitle: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
-  backBtn: { padding: 5 },
+  container: { flex: 1, backgroundColor: '#000' },
+  safeArea: { flex: 1 },
+  scrollContent: { paddingHorizontal: 25, paddingBottom: 100 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 15 },
+  backBtn: { width: 40, height: 40, justifyContent: 'center' },
+  headerTitle: { color: '#666', fontSize: 12, fontWeight: '900', letterSpacing: 2 },
   
-  content: {
-    flex: 1,
-    paddingHorizontal: 30,
-    alignItems: 'center'
-  },
-  iconContainer: {
-    width: 120, height: 120,
-    borderRadius: 60,
-    backgroundColor: '#121212',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 30,
-    borderWidth: 1,
-    borderColor: '#282828'
-  },
-  title: { color: '#FFF', fontSize: 28, fontWeight: 'bold', marginBottom: 10 },
-  subtitle: { color: '#B3B3B3', fontSize: 14, textAlign: 'center', marginBottom: 40, lineHeight: 20 },
+  hero: { alignItems: 'center', marginTop: 20, marginBottom: 40 },
+  iconGlow: { shadowColor: '#1DB954', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.4, shadowRadius: 20 },
+  iconCircle: { width: 90, height: 90, borderRadius: 45, backgroundColor: '#121212', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#282828' },
+  title: { color: '#FFF', fontSize: 28, fontWeight: '800', marginTop: 25, marginBottom: 10 },
+  subtitle: { color: '#B3B3B3', fontSize: 15, textAlign: 'center', lineHeight: 22 },
   
-  form: { width: '100%' },
-  label: { color: '#B3B3B3', fontSize: 14, marginBottom: 8, fontWeight: '600' },
-  input: {
-    backgroundColor: '#1E1E1E',
-    color: '#FFF',
-    padding: 20,
-    borderRadius: 15,
-    fontSize: 18,
-    borderWidth: 1,
-    borderColor: '#333'
-  },
+  form: { marginBottom: 30 },
+  inputLabel: { color: '#555', fontSize: 11, fontWeight: '900', letterSpacing: 1.5, marginBottom: 12 },
+  inputContainer: { backgroundColor: '#121212', borderRadius: 16, borderWidth: 1, borderColor: '#282828', height: 65, justifyContent: 'center', paddingHorizontal: 20 },
+  inputContainerFocused: { borderColor: '#1DB954', backgroundColor: '#181818' },
+  input: { color: '#FFF', fontSize: 18, fontWeight: '600' },
   
-  footer: {
-    padding: 20,
-    paddingBottom: 40,
-    backgroundColor: '#000',
-  },
-  createButton: {
-    backgroundColor: '#1DB954',
-    padding: 18,
-    borderRadius: 30,
-    alignItems: 'center',
-    shadowColor: '#1DB954',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10
-  },
-  createButtonText: { color: '#000', fontSize: 16, fontWeight: 'bold', textTransform: 'uppercase' }
+  card: { backgroundColor: '#121212', borderRadius: 20, padding: 20, flexDirection: 'row', gap: 15, borderWidth: 1, borderColor: '#282828' },
+  cardIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(29, 185, 84, 0.1)', justifyContent: 'center', alignItems: 'center' },
+  cardTitle: { color: '#FFF', fontSize: 15, fontWeight: '700', marginBottom: 4 },
+  cardText: { color: '#B3B3B3', fontSize: 13, lineHeight: 18 },
+
+  footer: { padding: 25, position: 'absolute', bottom: 0, left: 0, right: 0 },
+  mainButton: { backgroundColor: '#1DB954', height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center', shadowColor: '#1DB954', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.4, shadowRadius: 10 },
+  mainButtonText: { color: '#000', fontSize: 16, fontWeight: '800', letterSpacing: 1 },
+  buttonDisabled: { opacity: 0.6 }
 });
 
 export default CreateSessionScreen;

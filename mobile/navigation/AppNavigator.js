@@ -28,16 +28,17 @@ const AppNavigator = () => {
         name="Home" 
         component={HomeScreen}
         options={{ title: 'Spotify Party' }}
+        
       />
       <Stack.Screen 
         name="CreateSession" 
         component={CreateSessionScreen}
-        options={{ title: 'Créer une session' }}
+        options={{ title: 'Créer une session', headerShown: false }}
       />
       <Stack.Screen 
         name="JoinSession" 
         component={JoinSessionScreen}
-        options={{ title: 'Rejoindre' }}
+        options={{ title: 'Créer une session', headerShown: false }}
       />
       <Stack.Screen 
         name="Session" 

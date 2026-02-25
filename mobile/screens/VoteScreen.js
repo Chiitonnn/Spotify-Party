@@ -36,18 +36,16 @@ const VoteScreen = ({ navigation, route }) => {
     Keyboard.dismiss();
     setLoading(true);
     setHasSearched(true);
+    setResults([]); 
     
-    // On remet tout à zéro pour une nouvelle recherche
     setOffset(0);
     setHasMore(true);
 
     try {
-      const tracks = await SpotifyService.searchTracks(query, 0);
-      setResults(tracks);
-      
-      // Si Spotify renvoie moins de 50 musiques, c'est qu'on a tout trouvé !
-      if (tracks.length < 50) setHasMore(false);
-      
+      // 🚀 ON PASSE LE sessionId ICI
+      const tracks = await SpotifyService.searchTracks(query, 0, sessionId);
+      setResults(tracks || []);
+      if (tracks && tracks.length < 50) setHasMore(false);
     } catch (error) {
       console.error(error);
       Alert.alert('Erreur', 'Impossible de chercher la musique.');
@@ -58,20 +56,17 @@ const VoteScreen = ({ navigation, route }) => {
 
   // Charger la suite quand on arrive en bas
   const loadMoreTracks = async () => {
-    // 👇 LA CORRECTION EST ICI : on ajoute "|| !query.trim()"
     if (isLoadingMore || !hasMore || loading || !query.trim()) return;
 
     setIsLoadingMore(true);
     const nextOffset = offset + 50;
 
     try {
-      const moreTracks = await SpotifyService.searchTracks(query, nextOffset);
-      
+      // 🚀 ET ICI AUSSI
+      const moreTracks = await SpotifyService.searchTracks(query, nextOffset, sessionId);
       setResults(prevResults => [...prevResults, ...moreTracks]);
       setOffset(nextOffset);
-
       if (moreTracks.length < 50) setHasMore(false);
-      
     } catch (error) {
       console.error('Erreur Scroll Infini:', error);
     } finally {
