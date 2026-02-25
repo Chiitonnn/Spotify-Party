@@ -279,8 +279,8 @@ export const startParty = async (req, res) => {
 export const addTrackToQueue = async (req, res) => {
   try {
     const { sessionId } = req.params;
-    // L'invité envoie l'URI de la musique qu'il a choisie
-    const { trackUri, trackName, artistName } = req.body; 
+    // 🛡️ On récupère maintenant albumImage envoyé par le mobile
+    const { trackUri, trackName, artistName, albumImage } = req.body; 
 
     const session = await Session.findById(sessionId);
     if (!session) return res.status(404).json({ error: 'Session introuvable' });
@@ -294,15 +294,15 @@ export const addTrackToQueue = async (req, res) => {
     console.log(`📡 Demande d'ajout à la file d'attente : ${trackName} par l'utilisateur ${req.userId}`);
 
     try {
-      // 🔥 LA COMMANDE MAGIQUE SPOTIFY API
+      // 🔥 Commande Spotify API
       await spotifyApi.addToQueue(trackUri);
 
-      // (Optionnel) On sauvegarde dans la base de données pour afficher l'historique sur l'app
+      // ✅ On sauvegarde tout dans la base de données, y compris l'image pour l'affichage mobile
       session.approvedQueue.push({
         uri: trackUri,
         name: trackName,
         artist: artistName,
-        // Tu pourras ajouter l'image de l'album ici plus tard
+        albumImage: albumImage // 👈 Ajouté ici pour corriger le front
       });
       await session.save();
 
@@ -311,7 +311,6 @@ export const addTrackToQueue = async (req, res) => {
     } catch (spotifyError) {
       console.error('❌ Erreur AddToQueue Spotify:', spotifyError.message);
       
-      // Si l'hôte a fermé son Spotify, on renvoie le message d'astuce
       if (spotifyError.statusCode === 404 || spotifyError.statusCode === 403 || spotifyError.statusCode === 502) {
         return res.status(400).json({ 
           error: 'Le Spotify de l\'hôte est en veille. Dites-lui de lancer une musique !' 

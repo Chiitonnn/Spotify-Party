@@ -50,7 +50,7 @@ const sessionSchema = new mongoose.Schema({
     trackId: String,
     uri: String, // Vital pour la lecture
     name: String,
-    artists: [String],
+    artist: String,
     albumImage: String,
     addedAt: { type: Date, default: Date.now }
   }],

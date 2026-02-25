@@ -43,7 +43,7 @@ const AppNavigator = () => {
       <Stack.Screen 
         name="Session" 
         component={SessionScreen}
-        options={{ title: 'Session' }}
+        options={{ title: 'Session', headerShown: false }}
       />
       <Stack.Screen 
         name="Vote" 
