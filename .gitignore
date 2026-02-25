@@ -1,45 +1,21 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-*/site-packages/lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-
-# Virtual Environment
-venv/
-env/
-ENV/
-.venv
-virtualenv/
+# Dependencies
+node_modules/
+*/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 # Environment variables
 .env
 .env.local
 .env.*.local
+*.env
 
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
+# Logs
+logs/
+*.log
 
-# OS
+# OS files
 .DS_Store
 .DS_Store?
 ._*
@@ -48,39 +24,55 @@ virtualenv/
 ehthumbs.db
 Thumbs.db
 
-# Flutter/Dart
-mobile_app/build/
-mobile_app/.dart_tool/
-mobile_app/.flutter-plugins
-mobile_app/.flutter-plugins-dependencies
-mobile_app/.packages
-mobile_app/pubspec.lock
-mobile_app/ios/Pods/
-mobile_app/ios/.symlinks/
-mobile_app/android/.gradle/
-mobile_app/android/app/debug/
-mobile_app/android/app/profile/
-mobile_app/android/app/release/
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-*
 
-# Database
-*.db
-*.sqlite
-*.sqlite3
-*.db-shm
-*.db-wal
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
 
-# Logs
-*.log
-logs/
+# Mobile specific (Expo/React Native)
+mobile/.expo/
+mobile/.expo-shared/
+mobile/web-build/
+mobile/dist/
+mobile/*.orig.*
+mobile/*.jks
+mobile/*.p8
+mobile/*.p12
+mobile/*.key
+mobile/*.mobileprovision
+mobile/*.keystore
 
-# FastAPI / Uvicorn
-*.pid
+# iOS
+mobile/ios/Pods/
+mobile/ios/build/
+mobile/ios/*.xcworkspace
+!mobile/ios/default.xcworkspace
+mobile/ios/xcuserdata/
+mobile/ios/DerivedData/
+
+# Android
+mobile/android/app/build/
+mobile/android/build/
+mobile/android/.gradle/
+mobile/android/local.properties
+
+# Backend specific
+backend/uploads/
+backend/coverage/
 
 # Testing
-.pytest_cache/
-.coverage
-htmlcov/
+coverage/
+.nyc_output/
 
-# Spotify credentials (si tu as des fichiers de config)
-spotify_credentials.json
-config/secrets.json
+# Temporary files
+*.tmp
+*.temp
+*.cache

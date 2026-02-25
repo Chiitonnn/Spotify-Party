@@ -1,8 +1,0 @@
-fastapi
-uvicorn
-sqlmodel
-pydantic
-python-dotenv
-requests
-sqlalchemy
-aiofiles
