@@ -21,9 +21,11 @@ export const playTrack = async (uri) => {
   return response.data;
 };
 
-export const searchTracks = async (query, offset = 0) => {
+export const searchTracks = async (query, offset = 0, sessionId) => {
   try {
-    const response = await api.get(`/spotify/search?q=${encodeURIComponent(query)}&offset=${offset}`);
+    // On passe impérativement le sessionId pour autoriser la recherche aux invités
+    const url = `/spotify/search?q=${encodeURIComponent(query)}&offset=${offset}&sessionId=${sessionId}`;
+    const response = await api.get(url);
     return response.data.tracks;
   } catch (error) {
     throw error.response?.data || error.message;

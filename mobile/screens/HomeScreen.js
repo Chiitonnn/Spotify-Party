@@ -15,69 +15,83 @@ const HomeScreen = ({ navigation }) => {
   const { user, logout } = useAuth();
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <StatusBar barStyle="light-content" />
-      
-      <View style={styles.header}>
-        <View style={styles.headerUser}>
-          <View style={styles.avatarContainer}>
+      <SafeAreaView style={styles.safeArea}>
+
+        {/* HEADER */}
+        <View style={styles.header}>
+          <View style={styles.userInfo}>
             {user?.profileImage ? (
               <Image source={{ uri: user.profileImage }} style={styles.avatar} />
             ) : (
-              <Ionicons name="person" size={24} color="#B3B3B3" />
+              <View style={styles.avatarPlaceholder}>
+                <Ionicons name="person" size={20} color="#B3B3B3" />
+              </View>
             )}
-          </View>
-          <View>
-            <Text style={styles.greeting}>Bonjour,</Text>
-            <Text style={styles.username}>{user?.displayName || 'Invité'}</Text>
-          </View>
-        </View>
-        <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
-          <Ionicons name="log-out-outline" size={24} color="#FF4444" />
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.content}>
-        <Text style={styles.sectionTitle}>Que voulez-vous faire ?</Text>
-        
-        <View style={styles.grid}>
-          {/* Card Créer */}
-          <TouchableOpacity
-            style={[styles.card, styles.cardPrimary]}
-            onPress={() => navigation.navigate('CreateSession')}
-            activeOpacity={0.9}
-          >
-            <View style={styles.iconCircle}>
-              <Ionicons name="add" size={32} color="#000" />
+            <View style={styles.textInfo}>
+              <Text style={styles.greeting}>Bonjour,</Text>
+              <Text style={styles.username}>{user?.displayName || 'Invité'}</Text>
             </View>
-            <Text style={styles.cardTitle}>Créer une Session</Text>
-            <Text style={styles.cardSubtitle}>Devenez l'hôte</Text>
-          </TouchableOpacity>
+          </View>
 
-          {/* Card Rejoindre */}
-          <TouchableOpacity
-            style={[styles.card, styles.cardSecondary]}
-            onPress={() => navigation.navigate('JoinSession')} // Assure-toi d'avoir cet écran
-            activeOpacity={0.9}
-          >
-            <View style={[styles.iconCircle, { backgroundColor: '#333' }]}>
-              <Ionicons name="enter-outline" size={32} color="#FFF" />
-            </View>
-            <Text style={styles.cardTitle}>Rejoindre</Text>
-            <Text style={styles.cardSubtitle}>Entrer un code</Text>
+          <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
+            <Ionicons name="log-out-outline" size={24} color="#666" />
           </TouchableOpacity>
         </View>
 
-        {!user?.isPremium && (
-          <View style={styles.warningContainer}>
-            <Ionicons name="warning" size={20} color="#FFA500" />
-            <Text style={styles.warningText}>
-              Compte Premium requis pour être hôte.
-            </Text>
+        {/* CONTENU PRINCIPAL */}
+        <View style={styles.content}>
+          <Text style={styles.sectionTitle}>Prêt pour la soirée ?</Text>
+          <Text style={styles.sectionSubtitle}>Choisissez comment vous souhaitez participer.</Text>
+
+          <View style={styles.cardsContainer}>
+            {/* CARTE CRÉER (L'Hôte) */}
+            <TouchableOpacity
+              style={styles.actionCard}
+              onPress={() => navigation.navigate('CreateSession')}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.iconBox, { backgroundColor: 'rgba(29, 185, 84, 0.1)' }]}>
+                <Ionicons name="add" size={28} color="#1DB954" />
+              </View>
+              <View style={styles.cardText}>
+                <Text style={styles.cardTitle}>Créer un salon</Text>
+                <Text style={styles.cardSubtitle}>Devenez l'hôte de la soirée</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#333" />
+            </TouchableOpacity>
+
+            {/* CARTE REJOINDRE (L'Invité) */}
+            <TouchableOpacity
+              style={styles.actionCard}
+              onPress={() => navigation.navigate('JoinSession')}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.iconBox, { backgroundColor: '#1A1A1A' }]}>
+                <Ionicons name="enter-outline" size={26} color="#FFF" />
+              </View>
+              <View style={styles.cardText}>
+                <Text style={styles.cardTitle}>Rejoindre un salon</Text>
+                <Text style={styles.cardSubtitle}>Entrez le code d'un ami</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#333" />
+            </TouchableOpacity>
           </View>
-        )}
-      </View>
-    </SafeAreaView>
+
+          {/* MESSAGE PREMIUM (si applicable) */}
+          {!user?.isPremium && (
+            <View style={styles.premiumNotice}>
+              <Ionicons name="information-circle-outline" size={20} color="#B3B3B3" />
+              <Text style={styles.premiumText}>
+                Un compte Spotify Premium est requis pour créer un salon.
+              </Text>
+            </View>
+          )}
+        </View>
+
+      </SafeAreaView>
+    </View>
   );
 };
 
@@ -85,77 +99,119 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000',
-    paddingTop: 40
+  },
+  safeArea: {
+    flex: 1,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    marginBottom: 40
+    paddingTop: 20,
+    marginBottom: 40,
   },
-  headerUser: {
+  userInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 15
   },
-  avatarContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#282828',
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    marginRight: 15,
+  },
+  avatarPlaceholder: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#1E1E1E',
     justifyContent: 'center',
     alignItems: 'center',
-    overflow: 'hidden'
+    marginRight: 15,
   },
-  avatar: { width: '100%', height: '100%' },
-  greeting: { color: '#B3B3B3', fontSize: 14 },
-  username: { color: '#FFF', fontSize: 20, fontWeight: 'bold' },
+  textInfo: {
+    justifyContent: 'center',
+  },
+  greeting: {
+    color: '#B3B3B3',
+    fontSize: 14,
+  },
+  username: {
+    color: '#FFF',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
   logoutBtn: {
     padding: 10,
     backgroundColor: '#121212',
-    borderRadius: 20
-  },
-  
-  content: { paddingHorizontal: 20 },
-  sectionTitle: { color: '#FFF', fontSize: 24, fontWeight: 'bold', marginBottom: 20 },
-  
-  grid: { gap: 20 },
-  
-  card: {
-    padding: 25,
     borderRadius: 20,
-    height: 160,
-    justifyContent: 'space-between'
   },
-  cardPrimary: { backgroundColor: '#1DB954' },
-  cardSecondary: { backgroundColor: '#1E1E1E', borderWidth: 1, borderColor: '#333' },
-  
-  iconCircle: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#FFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10
+  content: {
+    flex: 1,
+    paddingHorizontal: 20,
   },
-  
-  cardTitle: { color: '#FFF', fontSize: 22, fontWeight: 'bold' },
-  cardSubtitle: { color: 'rgba(255,255,255,0.7)', fontSize: 14, fontWeight: '600' },
-  
-  warningContainer: {
-    marginTop: 30,
-    backgroundColor: 'rgba(255, 165, 0, 0.1)',
-    padding: 15,
-    borderRadius: 12,
+  sectionTitle: {
+    color: '#FFF',
+    fontSize: 28,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  sectionSubtitle: {
+    color: '#B3B3B3',
+    fontSize: 15,
+    marginBottom: 35,
+  },
+  cardsContainer: {
+    gap: 15,
+  },
+  actionCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    backgroundColor: '#121212',
+    padding: 20,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255, 165, 0, 0.3)'
+    borderColor: '#282828',
   },
-  warningText: { color: '#FFA500', fontSize: 14 }
+  iconBox: {
+    width: 50,
+    height: 50,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 15,
+  },
+  cardText: {
+    flex: 1,
+  },
+  cardTitle: {
+    color: '#FFF',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  cardSubtitle: {
+    color: '#B3B3B3',
+    fontSize: 14,
+  },
+  premiumNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 30,
+    padding: 15,
+    backgroundColor: '#121212',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#282828',
+    gap: 10,
+  },
+  premiumText: {
+    color: '#B3B3B3',
+    fontSize: 13,
+    flex: 1,
+    lineHeight: 18,
+  },
 });
 
 export default HomeScreen;

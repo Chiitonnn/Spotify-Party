@@ -23,21 +23,36 @@ const SessionScreen = ({ navigation, route }) => {
 
   const isHost = currentSession?.hostId?._id === user?._id || currentSession?.hostId === user?._id;
 
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', () => {
-      loadSession();
-    });
-    return unsubscribe;
-  }, [navigation]);
-
   const loadSession = async () => {
     try {
       const session = await SessionService.getSession(sessionId);
       setCurrentSession(session);
     } catch (error) {
-      console.error(error);
+      console.error("Erreur rafraîchissement session:", error);
     }
   };
+  
+  useEffect(() => {
+    // Chargement initial immédiat au montage du composant
+    loadSession();
+
+    // 🔄 SYSTÈME DE POLLING : 
+    // On rafraîchit les données toutes les 5 secondes pour voir les nouveaux invités et les sons ajoutés
+    const interval = setInterval(() => {
+      loadSession();
+    }, 5000);
+
+    // On garde l'écouteur de focus pour forcer un refresh quand on revient de l'écran de recherche
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadSession();
+    });
+
+    // Nettoyage complet : on arrête le chrono et on enlève l'écouteur quand on quitte l'écran
+    return () => {
+      clearInterval(interval);
+      unsubscribe();
+    };
+  }, [navigation, sessionId]);
 
   const handleShareCode = async () => {
     try {

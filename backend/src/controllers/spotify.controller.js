@@ -1,5 +1,28 @@
 import { createSpotifyApi } from '../config/spotify.js';
 import User from '../models/User.js';
+import Session from '../models/Session.js';
+
+const getValidToken = async (user) => {
+  const spotifyApi = createSpotifyApi(user.spotifyAccessToken);
+  spotifyApi.setRefreshToken(user.spotifyRefreshToken);
+
+  try {
+    // Vérification rapide de validité
+    await spotifyApi.getMe();
+    return user.spotifyAccessToken;
+  } catch (error) {
+    if (error.statusCode === 401) {
+      console.log(`🔄 Token expiré pour ${user.displayName}, rafraîchissement...`);
+      const data = await spotifyApi.refreshAccessToken();
+      const newToken = data.body['access_token'];
+      
+      user.spotifyAccessToken = newToken;
+      await user.save();
+      return newToken;
+    }
+    throw error;
+  }
+};
 
 // 1. Récupérer les playlists (Sécurisé)
 export const getUserPlaylists = async (req, res) => {
@@ -64,12 +87,28 @@ export const getPlaylistTracks = async (req, res) => {
 // 3. Recherche (Sécurisé)
 export const searchTracks = async (req, res) => {
   try {
-    // On récupère "q" (la recherche) et "offset" (le décalage, par défaut 0)
-    const { q, offset = 0 } = req.query; 
-    const user = await User.findById(req.userId);
-    const spotifyApi = createSpotifyApi(user.spotifyAccessToken);
+    const { q, offset = 0, sessionId } = req.query;
+    if (!q) return res.status(400).json({ error: "No search query" });
+
+    let targetUser;
+
+    // Si on a un sessionId, on cherche l'hôte pour utiliser ses privilèges Spotify
+    if (sessionId) {
+      const session = await Session.findById(sessionId).populate('hostId');
+      targetUser = session?.hostId;
+    }
+
+    // Fallback : on utilise l'utilisateur actuel
+    if (!targetUser) {
+      targetUser = await User.findById(req.userId);
+    }
+
+    if (!targetUser) return res.status(404).json({ error: "Hôte introuvable" });
+
+    // On récupère un token forcément valide (auto-refresh inclus)
+    const validToken = await getValidToken(targetUser);
+    const spotifyApi = createSpotifyApi(validToken);
     
-    // On passe l'offset à Spotify (ex: chercher à partir de la 50ème musique)
     const data = await spotifyApi.searchTracks(q, { 
       limit: 50, 
       offset: parseInt(offset), 
@@ -83,13 +122,12 @@ export const searchTracks = async (req, res) => {
         artists: track.artists.map(a => a.name),
         album: track.album.name,
         albumImage: track.album.images?.[0]?.url,
-        duration: track.duration_ms,
-        uri: track.uri,
-        preview_url: track.preview_url
+        uri: track.uri
       }))
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("❌ Erreur Search:", error.message);
+    res.status(error.statusCode || 500).json({ error: "Erreur lors de la recherche" });
   }
 };
 
