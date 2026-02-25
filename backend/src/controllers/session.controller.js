@@ -212,7 +212,7 @@ export const startParty = async (req, res) => {
   try {
     const { sessionId } = req.params;
     const session = await Session.findById(sessionId);
-    const user = await User.findById(req.userId); // L'hôte
+    const user = await User.findById(req.userId);
 
     if (!session) return res.status(404).json({ error: 'Session not found' });
     if (session.hostId.toString() !== req.userId) {
@@ -222,10 +222,9 @@ export const startParty = async (req, res) => {
       return res.status(400).json({ error: 'Aucune musique n\'a été votée !' });
     }
 
-    // 1. Préparer l'API Spotify de l'hôte
     const spotifyApi = createSpotifyApi(user.spotifyAccessToken);
 
-    // 2. Trouver l'appareil actif (Logique "Smartphone First")
+    // 1. Chercher les appareils
     const devicesData = await spotifyApi.getMyDevices();
     const devices = devicesData.body.devices;
     
@@ -234,23 +233,45 @@ export const startParty = async (req, res) => {
                       || devices[0];
 
     if (!targetDevice) {
-      return res.status(404).json({ error: 'Aucun appareil Spotify trouvé. Ouvrez Spotify !' });
+      return res.status(404).json({ error: 'Ouvrez Spotify sur votre téléphone et lancez une musique.' });
     }
 
-    // 3. Récupérer les URIs des musiques validées
     const uris = session.approvedQueue.map(track => track.uri);
+    console.log(`🚀 Lancement soirée sur ${targetDevice.name}...`);
 
-    // 4. Lancer la lecture de la LISTE ENTIÈRE
-    console.log(`🚀 Lancement soirée sur ${targetDevice.name} avec ${uris.length} titres`);
-    await spotifyApi.play({ 
-      uris: uris, 
-      device_id: targetDevice.id 
-    });
+    try {
+      // ⚡ Tentative de transfert
+      if (!targetDevice.is_active) {
+        console.log("💤 Appareil inactif, tentative de transfert...");
+        await spotifyApi.transferMyPlayback([targetDevice.id]);
+        
+        // On attend 1 seconde complète pour laisser le réseau se faire
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
 
-    res.json({ message: 'Party started!', count: uris.length });
+      // 🎵 On lance la musique
+      await spotifyApi.play({ 
+        uris: uris, 
+        device_id: targetDevice.id 
+      });
+
+      res.json({ message: 'Party started!', count: uris.length });
+
+    } catch (playError) {
+      console.error('❌ Erreur de lecture Spotify:', playError.message);
+      
+      // 👇 LE MESSAGE D'ERREUR ADAPTÉ À TA DÉCOUVERTE !
+      if (playError.statusCode === 404 || playError.statusCode === 403 || playError.statusCode === 502) {
+        return res.status(400).json({ 
+          error: 'Astuce : Lancez d\'abord une musique manuellement sur votre application Spotify, mettez pause, puis cliquez sur "Lancer la Soirée" !' 
+        });
+      }
+      
+      throw playError;
+    }
 
   } catch (error) {
     console.error('❌ Start Party Error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error.message || 'Une erreur est survenue lors du lancement.' });
   }
 };
