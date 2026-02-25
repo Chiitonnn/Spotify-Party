@@ -34,3 +34,21 @@ export const startParty = async (sessionId) => {
   const response = await api.post(`/sessions/${sessionId}/start`);
   return response.data;
 };
+
+export const addToQueue = async (sessionId, trackData) => {
+  try {
+    const response = await api.post(`/sessions/${sessionId}/queue`, trackData);
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};
+
+export const updateQueueOrder = async (sessionId, newQueue) => {
+  try {
+    const response = await api.put(`/sessions/${sessionId}/queue/reorder`, { newQueue });
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};

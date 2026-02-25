@@ -10,11 +10,6 @@ export const getPlaylistTracks = async (playlistId) => {
   return response.data.tracks;
 };
 
-export const searchTracks = async (query) => {
-  const response = await api.get('/spotify/search', { params: { q: query } });
-  return response.data.tracks;
-};
-
 export const getTrack = async (trackId) => {
   const response = await api.get(`/spotify/tracks/${trackId}`);
   return response.data;
@@ -24,4 +19,13 @@ export const getTrack = async (trackId) => {
 export const playTrack = async (uri) => {
   const response = await api.put('/spotify/play', { uri });
   return response.data;
+};
+
+export const searchTracks = async (query, offset = 0) => {
+  try {
+    const response = await api.get(`/spotify/search?q=${encodeURIComponent(query)}&offset=${offset}`);
+    return response.data.tracks;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
 };

@@ -275,3 +275,75 @@ export const startParty = async (req, res) => {
     res.status(500).json({ error: error.message || 'Une erreur est survenue lors du lancement.' });
   }
 };
+
+export const addTrackToQueue = async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    // L'invité envoie l'URI de la musique qu'il a choisie
+    const { trackUri, trackName, artistName } = req.body; 
+
+    const session = await Session.findById(sessionId);
+    if (!session) return res.status(404).json({ error: 'Session introuvable' });
+
+    // On récupère le compte Spotify de l'hôte
+    const host = await User.findById(session.hostId);
+    if (!host) return res.status(404).json({ error: 'Hôte introuvable' });
+
+    const spotifyApi = createSpotifyApi(host.spotifyAccessToken);
+
+    console.log(`📡 Demande d'ajout à la file d'attente : ${trackName} par l'utilisateur ${req.userId}`);
+
+    try {
+      // 🔥 LA COMMANDE MAGIQUE SPOTIFY API
+      await spotifyApi.addToQueue(trackUri);
+
+      // (Optionnel) On sauvegarde dans la base de données pour afficher l'historique sur l'app
+      session.approvedQueue.push({
+        uri: trackUri,
+        name: trackName,
+        artist: artistName,
+        // Tu pourras ajouter l'image de l'album ici plus tard
+      });
+      await session.save();
+
+      res.json({ message: 'Titre ajouté avec succès à la file d\'attente !' });
+
+    } catch (spotifyError) {
+      console.error('❌ Erreur AddToQueue Spotify:', spotifyError.message);
+      
+      // Si l'hôte a fermé son Spotify, on renvoie le message d'astuce
+      if (spotifyError.statusCode === 404 || spotifyError.statusCode === 403 || spotifyError.statusCode === 502) {
+        return res.status(400).json({ 
+          error: 'Le Spotify de l\'hôte est en veille. Dites-lui de lancer une musique !' 
+        });
+      }
+      throw spotifyError;
+    }
+
+  } catch (error) {
+    console.error('❌ Erreur serveur AddToQueue:', error);
+    res.status(500).json({ error: error.message || 'Impossible d\'ajouter la musique.' });
+  }
+};
+
+export const updateQueueOrder = async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const { newQueue } = req.body;
+
+    const session = await Session.findById(sessionId);
+    if (!session) return res.status(404).json({ error: 'Session introuvable' });
+
+    // Seul l'hôte a le droit de réorganiser
+    if (session.hostId.toString() !== req.userId) {
+      return res.status(403).json({ error: 'Seul l\'hôte peut réorganiser la file.' });
+    }
+
+    session.approvedQueue = newQueue;
+    await session.save();
+
+    res.json(session);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};

@@ -64,11 +64,17 @@ export const getPlaylistTracks = async (req, res) => {
 // 3. Recherche (Sécurisé)
 export const searchTracks = async (req, res) => {
   try {
-    const { q } = req.query;
+    // On récupère "q" (la recherche) et "offset" (le décalage, par défaut 0)
+    const { q, offset = 0 } = req.query; 
     const user = await User.findById(req.userId);
     const spotifyApi = createSpotifyApi(user.spotifyAccessToken);
     
-    const data = await spotifyApi.searchTracks(q, { limit: 20, market: 'FR' });
+    // On passe l'offset à Spotify (ex: chercher à partir de la 50ème musique)
+    const data = await spotifyApi.searchTracks(q, { 
+      limit: 50, 
+      offset: parseInt(offset), 
+      market: 'FR' 
+    });
     
     res.json({
       tracks: data.body.tracks.items.map(track => ({
