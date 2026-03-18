@@ -8,6 +8,7 @@
     "dev:frontend": "cd frontend && npm run dev",
     "tunnel": "npx cloudflared tunnel --url http://localhost:3000",
     "start:all": "powershell -ExecutionPolicy Bypass -File ./scripts/start-all.ps1",
+    "start:mobile": "powershell -ExecutionPolicy Bypass -File ./scripts/start-mobile-tunnel.ps1",
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "start": "npm run dev"
   },
