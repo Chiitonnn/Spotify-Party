@@ -306,6 +306,10 @@ export const addTrackToQueue = async (req, res) => {
       });
       await session.save();
 
+      // ⚡ NOUVEAUTÉ : On prévient tous les clients de la mise à jour de la file !
+      const io = getIO();
+      io.to(session._id.toString()).emit('queue_updated', session.approvedQueue);
+
       res.json({ message: 'Titre ajouté avec succès à la file d\'attente !' });
 
     } catch (spotifyError) {
@@ -341,6 +345,10 @@ export const updateQueueOrder = async (req, res) => {
 
     session.approvedQueue = newQueue;
     await session.save();
+
+    // ⚡ NOUVEAUTÉ : On prévient tous les clients de la réorganisation de la file !
+    const io = getIO();
+    io.to(session._id.toString()).emit('queue_updated', session.approvedQueue);
 
     res.json(session);
   } catch (error) {

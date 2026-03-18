@@ -21,6 +21,23 @@ npx expo start --tunnel
 
 ---
 
+## 🐳 Déploiement avec Docker
+
+Pour simplifier le déploiement de l'API (Backend) et de la base de données, vous pouvez utiliser Docker :
+
+```bash
+# À la racine du projet
+docker compose up -d --build
+```
+
+Cela démarrera :
+- L'API Node.js sur le port `3000`
+- Une base de données MongoDB locale sur le port `27017`
+
+> **Note :** Les variables d'environnement (`.env`) du dossier `backend` seront automatiquement utilisées. La variable `MONGODB_URI` sera écrasée pour utiliser le conteneur MongoDB local fourni par Docker (`mongodb://mongodb:27017/spotify_party`).
+
+---
+
 ## 🏗️ Architecture
 
 Le projet est divisé en trois parties :

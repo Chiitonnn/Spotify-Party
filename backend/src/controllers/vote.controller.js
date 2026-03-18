@@ -73,6 +73,9 @@ export const submitVote = async (req, res) => {
             message: `${track.name} ajoutée à la playlist de soirée !` 
           });
 
+          // ⚡ NOUVEAUTÉ : On prévient de la mise à jour complète de la file
+          io.to(sessionId).emit('queue_updated', session.approvedQueue);
+
         } catch (spotifyError) {
           console.error('Erreur fetch track details:', spotifyError);
         }

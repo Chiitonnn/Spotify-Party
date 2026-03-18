@@ -36,20 +36,16 @@ const SessionScreen = ({ navigation, route }) => {
     // Chargement initial immédiat au montage du composant
     loadSession();
 
-    // 🔄 SYSTÈME DE POLLING : 
-    // On rafraîchit les données toutes les 5 secondes pour voir les nouveaux invités et les sons ajoutés
-    const interval = setInterval(() => {
-      loadSession();
-    }, 5000);
+    // ⚡ NOUVEAUTÉ : Plus de polling HTTP `setInterval` ici ! 
+    // Le système est maintenant 100% Temps Réel grâce aux WebSockets connectés dans le SessionContext.
 
     // On garde l'écouteur de focus pour forcer un refresh quand on revient de l'écran de recherche
     const unsubscribe = navigation.addListener('focus', () => {
       loadSession();
     });
 
-    // Nettoyage complet : on arrête le chrono et on enlève l'écouteur quand on quitte l'écran
+    // Nettoyage complet : on enlève l'écouteur quand on quitte l'écran
     return () => {
-      clearInterval(interval);
       unsubscribe();
     };
   }, [navigation, sessionId]);

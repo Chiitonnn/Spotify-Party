@@ -16,6 +16,7 @@ export const SessionProvider = ({ children }) => {
       initWebSocket(currentSession._id);
       
       onEvent('vote_update', handleVoteUpdate);
+      onEvent('queue_updated', handleQueueUpdated);
       onEvent('track_approved', handleTrackApproved);
       onEvent('user_joined', handleUserJoined);
       onEvent('user_left', handleUserLeft);
@@ -36,6 +37,10 @@ export const SessionProvider = ({ children }) => {
     }));
   };
 
+  const handleQueueUpdated = (newQueue) => {
+    setCurrentSession(prev => prev ? { ...prev, approvedQueue: newQueue } : null);
+  };
+
   const handleTrackApproved = (data) => {
     console.log('Track approved:', data.trackId);
     // Lancer la musique
@@ -43,10 +48,20 @@ export const SessionProvider = ({ children }) => {
 
   const handleUserJoined = (data) => {
     setParticipants(prev => [...prev, data.userId]);
+    // ⚡ Mise à jour directe du contexte UI pour rafraîchir l'écran
+    setCurrentSession(prev => prev ? { 
+      ...prev, 
+      participants: [...(prev.participants || []), { userId: data.userId }] 
+    } : null);
   };
 
   const handleUserLeft = (data) => {
     setParticipants(prev => prev.filter(id => id !== data.userId));
+    // ⚡ Rafraîchissement direct de la baisse du nombre de personnes
+    setCurrentSession(prev => prev ? { 
+      ...prev, 
+      participants: (prev.participants || []).filter(p => p.userId !== data.userId && p.userId?._id !== data.userId) 
+    } : null);
   };
 
   const handleSessionClosed = () => {

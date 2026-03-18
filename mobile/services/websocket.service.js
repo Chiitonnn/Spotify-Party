@@ -1,10 +1,19 @@
 import io from 'socket.io-client';
+import api from '../config/api';
 
-const SOCKET_URL = 'https://spotify-party.onrender.com';
+// On récupère dynamiquement l'URL (Ngrok, local, ou Render) et on enlève le '/api' à la fin
+const getSocketUrl = () => {
+  const baseUrl = api.defaults.baseURL || 'https://spotify-party.onrender.com/api';
+  return baseUrl.replace(/\/api\/?$/, '');
+};
+
 let socket = null;
 
 export const initWebSocket = (sessionId) => {
-  socket = io(SOCKET_URL, {
+  const socketUrl = getSocketUrl();
+  console.log('🔗 [WEBSOCKET] Tentative de connexion vers:', socketUrl);
+
+  socket = io(socketUrl, {
     transports: ['websocket'],
     reconnection: true
   });
