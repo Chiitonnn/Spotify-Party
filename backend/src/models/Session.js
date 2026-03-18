@@ -12,6 +12,19 @@ const sessionSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  mode: {
+    type: String,
+    enum: ['classic', 'vote'],
+    default: 'classic'
+  },
+  status: {
+    type: String,
+    enum: ['preparing', 'active', 'finished'],
+    default: 'active'
+  },
+  currentTrackId: {
+    type: String
+  },
 
   name: {
     type: String,

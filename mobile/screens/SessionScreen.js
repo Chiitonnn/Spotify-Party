@@ -17,7 +17,7 @@ import * as SessionService from '../services/session.service';
 
 const SessionScreen = ({ navigation, route }) => {
   const { user } = useAuth();
-  const { currentSession, setCurrentSession } = useSession();
+  const { currentSession, setCurrentSession, skipData, prepProgress } = useSession();
   const { sessionId } = route.params;
   const [starting, setStarting] = useState(false);
 
@@ -110,6 +110,17 @@ const SessionScreen = ({ navigation, route }) => {
     }
   };
 
+  const handleSkip = async () => {
+    try {
+      await SessionService.submitVote(sessionId, { 
+        trackId: currentSession.currentTrackId || 'current', 
+        voteType: 'skip' 
+      });
+    } catch (error) {
+      console.error("Erreur skip:", error);
+    }
+  };
+
   const handleLeaveSession = async () => {
     Alert.alert(
       'Quitter',
@@ -164,6 +175,47 @@ const SessionScreen = ({ navigation, route }) => {
           <Text style={styles.participantsText}>{currentSession.participants?.length || 1} Invités</Text>
         </View>
       </View>
+
+      {/* 🟢 MODE PRÉPARATION (Si actif) */}
+      {currentSession.status === 'preparing' && (
+        <View style={styles.prepCard}>
+          <View style={styles.prepInfo}>
+            <Ionicons name="time-outline" size={24} color="#1DB954" />
+            <Text style={styles.prepTitle}>Phase de préparation</Text>
+          </View>
+          <Text style={styles.prepText}>
+            Ajoutez des musiques pour lancer la soirée ! 
+            ({prepProgress.count || currentSession.approvedQueue?.length || 0} / 10)
+          </Text>
+          <View style={styles.progressBarBg}>
+            <View 
+              style={[
+                styles.progressBarFill, 
+                { width: `${Math.min(100, ((prepProgress.count || currentSession.approvedQueue?.length || 0) / 10) * 100)}%` }
+              ]} 
+            />
+          </View>
+        </View>
+      )}
+
+      {/* 🟠 MODE VOTE / SKIP (Si actif) */}
+      {currentSession.mode === 'vote' && currentSession.status === 'active' && (
+        <View style={styles.skipCard}>
+          <Text style={styles.skipLabel}>VOTE EN COURS : SKIP ?</Text>
+          <View style={styles.skipInfo}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.skipVotes}>
+                {skipData.currentVotes || 0} / {skipData.threshold || Math.ceil((currentSession.participants?.length || 1) / 2)} votes
+              </Text>
+              <Text style={styles.skipSub}>Majorité requise pour passer</Text>
+            </View>
+            <TouchableOpacity style={styles.skipBtn} onPress={handleSkip}>
+              <Ionicons name="play-skip-forward" size={24} color="#000" />
+              <Text style={styles.skipBtnText}>SKIP</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       {/* FILE D'ATTENTE */}
       <View style={styles.queueHeader}>
@@ -280,7 +332,23 @@ const styles = StyleSheet.create({
   searchButton: { backgroundColor: '#282828', padding: 18, borderRadius: 30, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: '#444' },
   searchButtonText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
   startButton: { backgroundColor: '#1DB954', padding: 18, borderRadius: 30, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10 },
-  startButtonText: { color: '#000', fontSize: 16, fontWeight: 'bold' }
+  startButtonText: { color: '#000', fontSize: 16, fontWeight: 'bold' },
+
+  // NOUVEAUX STYLES MODES
+  prepCard: { backgroundColor: '#1DB95420', borderRadius: 16, padding: 20, marginBottom: 25, borderWidth: 1, borderColor: '#1DB95450' },
+  prepInfo: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+  prepTitle: { color: '#1DB954', fontSize: 16, fontWeight: 'bold' },
+  prepText: { color: '#B3B3B3', fontSize: 14, marginBottom: 15 },
+  progressBarBg: { height: 6, backgroundColor: '#1E1E1E', borderRadius: 3, overflow: 'hidden' },
+  progressBarFill: { height: '100%', backgroundColor: '#1DB954' },
+
+  skipCard: { backgroundColor: '#121212', borderRadius: 16, padding: 18, marginBottom: 25, borderWidth: 1, borderColor: '#1DB954' },
+  skipLabel: { color: '#1DB954', fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginBottom: 12 },
+  skipInfo: { flexDirection: 'row', alignItems: 'center', gap: 15 },
+  skipVotes: { color: '#FFF', fontSize: 20, fontWeight: 'bold' },
+  skipSub: { color: '#666', fontSize: 12, marginTop: 2 },
+  skipBtn: { backgroundColor: '#1DB954', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 25, gap: 8 },
+  skipBtnText: { color: '#000', fontWeight: 'bold' }
 });
 
 export default SessionScreen;

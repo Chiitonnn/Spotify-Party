@@ -1,5 +1,6 @@
 import io from 'socket.io-client';
 import api from '../config/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // On récupère dynamiquement l'URL (Ngrok, local, ou Render) et on enlève le '/api' à la fin
 const getSocketUrl = () => {
@@ -9,13 +10,20 @@ const getSocketUrl = () => {
 
 let socket = null;
 
-export const initWebSocket = (sessionId) => {
+export const initWebSocket = async (sessionId) => {
   const socketUrl = getSocketUrl();
+  
+  // 🔐 Récupération du token depuis le stockage local
+  const token = await AsyncStorage.getItem('token');
+  
   console.log('🔗 [WEBSOCKET] Tentative de connexion vers:', socketUrl);
 
   socket = io(socketUrl, {
     transports: ['websocket'],
-    reconnection: true
+    reconnection: true,
+    auth: {
+      token: token // 🛡️ Envoi du token pour la sécurité Backend
+    }
   });
 
   socket.on('connect', () => {

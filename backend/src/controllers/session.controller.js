@@ -6,8 +6,8 @@ import { createSpotifyApi } from '../config/spotify.js';
 
 export const createSession = async (req, res) => {
   try {
-    // On récupère trackLimit du front
-    const { name, playlistIds, votingThreshold, trackLimit } = req.body;
+    // On récupère mode et trackLimit du front
+    const { name, playlistIds, votingThreshold, trackLimit, mode } = req.body;
     const user = await User.findById(req.userId);
     
     if (!user.isPremium) {
@@ -63,6 +63,8 @@ export const createSession = async (req, res) => {
       votingThreshold: votingThreshold || 5,
       trackLimit: limit,
       trackPool: finalPool, // 💾 On sauvegarde la sélection !
+      mode: mode || 'classic',
+      status: mode === 'vote' ? 'preparing' : 'active',
       participants: [{
         userId: req.userId,
         joinedAt: new Date()
@@ -254,6 +256,10 @@ export const startParty = async (req, res) => {
         uris: uris, 
         device_id: targetDevice.id 
       });
+
+      // 💾 On track la première musique pour le système de vote Skip
+      session.currentTrackId = session.approvedQueue[0]?.trackId;
+      await session.save();
 
       res.json({ message: 'Party started!', count: uris.length });
 

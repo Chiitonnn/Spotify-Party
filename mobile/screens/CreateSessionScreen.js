@@ -20,6 +20,7 @@ import * as SessionService from '../services/session.service';
 const CreateSessionScreen = ({ navigation }) => {
   const { setCurrentSession } = useSession();
   const [sessionName, setSessionName] = useState('Spotify Party');
+  const [mode, setMode] = useState('classic'); // 'classic' ou 'vote'
   const [loading, setLoading] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
 
@@ -32,6 +33,7 @@ const CreateSessionScreen = ({ navigation }) => {
       setLoading(true);
       const session = await SessionService.createSession({
         name: sessionName,
+        mode: mode,
         playlistIds: [], votingThreshold: 1, trackLimit: 50 
       });
       setCurrentSession(session);
@@ -84,6 +86,35 @@ const CreateSessionScreen = ({ navigation }) => {
                   placeholderTextColor="#444"
                   selectionColor="#1DB954"
                 />
+              </View>
+
+              <Text style={[styles.inputLabel, { marginTop: 25 }]}>MODE DE JEU</Text>
+              <View style={styles.modeContainer}>
+                <TouchableOpacity 
+                  style={[styles.modeCard, mode === 'classic' && styles.modeCardActive]} 
+                  onPress={() => setMode('classic')}
+                >
+                  <View style={[styles.radio, mode === 'classic' && styles.radioActive]}>
+                    {mode === 'classic' && <View style={styles.radioInner} />}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.modeTitle}>Mode Classique</Text>
+                    <Text style={styles.modeDesc}>File d'attente collaborative standard.</Text>
+                  </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={[styles.modeCard, mode === 'vote' && styles.modeCardActive]} 
+                  onPress={() => setMode('vote')}
+                >
+                  <View style={[styles.radio, mode === 'vote' && styles.radioActive]}>
+                    {mode === 'vote' && <View style={styles.radioInner} />}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.modeTitle}>Mode Vote (Skip)</Text>
+                    <Text style={styles.modeDesc}>Tout le monde propose 10 sons, puis vote pour passer ou garder.</Text>
+                  </View>
+                </TouchableOpacity>
               </View>
             </View>
 
@@ -139,6 +170,24 @@ const styles = StyleSheet.create({
   inputContainerFocused: { borderColor: '#1DB954', backgroundColor: '#181818' },
   input: { color: '#FFF', fontSize: 18, fontWeight: '600' },
   
+  modeContainer: { gap: 12 },
+  modeCard: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    backgroundColor: '#121212', 
+    borderRadius: 16, 
+    padding: 18, 
+    borderWidth: 1, 
+    borderColor: '#282828',
+    gap: 15
+  },
+  modeCardActive: { borderColor: '#1DB954', backgroundColor: '#181818' },
+  modeTitle: { color: '#FFF', fontSize: 15, fontWeight: '700', marginBottom: 2 },
+  modeDesc: { color: '#666', fontSize: 13 },
+  radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#444', justifyContent: 'center', alignItems: 'center' },
+  radioActive: { borderColor: '#1DB954' },
+  radioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#1DB954' },
+
   card: { backgroundColor: '#121212', borderRadius: 20, padding: 20, flexDirection: 'row', gap: 15, borderWidth: 1, borderColor: '#282828' },
   cardIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(29, 185, 84, 0.1)', justifyContent: 'center', alignItems: 'center' },
   cardTitle: { color: '#FFF', fontSize: 15, fontWeight: '700', marginBottom: 4 },

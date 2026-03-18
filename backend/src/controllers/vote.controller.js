@@ -23,14 +23,43 @@ export const submitVote = async (req, res) => {
       return res.status(403).json({ error: 'Not in session' });
     }
     
-    // 3. Enregistrer le vote
+    // 3. Cas particulier : Vote pour PASSER la musique en cours (Skip)
+    if (voteType === 'skip') {
+      const vote = await Vote.findOneAndUpdate(
+        { sessionId, userId: req.userId, trackId: session.currentTrackId || 'current' },
+        { voteType: 'skip' },
+        { upsert: true, new: true }
+      );
+
+      const skipVotes = await Vote.find({ 
+        sessionId, 
+        trackId: session.currentTrackId || 'current', 
+        voteType: 'skip' 
+      });
+
+      const io = getIO();
+      io.to(sessionId).emit('skip_update', {
+        currentVotes: skipVotes.length,
+        threshold: Math.ceil(session.participants.length / 2) // Majorité simple pour skip
+      });
+
+      if (skipVotes.length >= Math.ceil(session.participants.length / 2)) {
+        io.to(sessionId).emit('track_skipped', { message: 'La majorité a voté pour passer !' });
+        // On nettoie les votes de skip pour la prochaine
+        await Vote.deleteMany({ sessionId, trackId: session.currentTrackId || 'current', voteType: 'skip' });
+      }
+
+      return res.json({ message: 'Vote skip enregistré' });
+    }
+
+    // 4. Enregistrer le vote classique (like/dislike)
     const vote = await Vote.findOneAndUpdate(
       { sessionId, userId: req.userId, trackId },
       { voteType },
       { upsert: true, new: true }
     );
     
-    // 4. Calcul des résultats
+    // 5. Calcul des résultats
     const votes = await Vote.find({ sessionId, trackId });
     const likes = votes.filter(v => v.voteType === 'like').length;
     const dislikes = votes.filter(v => v.voteType === 'dislike').length;
@@ -72,6 +101,20 @@ export const submitVote = async (req, res) => {
             trackId, 
             message: `${track.name} ajoutée à la playlist de soirée !` 
           });
+
+          // ⚡ NOUVEAUTÉ : Gestion de la phase de préparation (10 sons)
+          if (session.mode === 'vote' && session.status === 'preparing') {
+             if (session.approvedQueue.length >= 10) {
+               session.status = 'active';
+               await session.save();
+               io.to(sessionId).emit('session_ready', { message: 'C\'est parti ! 10 musiques sont prêtes.' });
+             } else {
+               io.to(sessionId).emit('preparation_progress', { 
+                 count: session.approvedQueue.length, 
+                 needed: 10 
+               });
+             }
+          }
 
           // ⚡ NOUVEAUTÉ : On prévient de la mise à jour complète de la file
           io.to(sessionId).emit('queue_updated', session.approvedQueue);

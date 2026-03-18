@@ -10,17 +10,27 @@ export const SessionProvider = ({ children }) => {
   const [currentTrack, setCurrentTrack] = useState(null);
   const [votes, setVotes] = useState({});
   const [participants, setParticipants] = useState([]);
+  const [skipData, setSkipData] = useState({ currentVotes: 0, threshold: 0 });
+  const [prepProgress, setPrepProgress] = useState({ count: 0, needed: 10 });
 
   useEffect(() => {
     if (currentSession) {
-      initWebSocket(currentSession._id);
-      
-      onEvent('vote_update', handleVoteUpdate);
-      onEvent('queue_updated', handleQueueUpdated);
-      onEvent('track_approved', handleTrackApproved);
-      onEvent('user_joined', handleUserJoined);
-      onEvent('user_left', handleUserLeft);
-      onEvent('session_closed', handleSessionClosed);
+      const connectSocket = async () => {
+        await initWebSocket(currentSession._id);
+        
+        onEvent('vote_update', handleVoteUpdate);
+        onEvent('queue_updated', handleQueueUpdated);
+        onEvent('track_approved', handleTrackApproved);
+        onEvent('user_joined', handleUserJoined);
+        onEvent('user_left', handleUserLeft);
+        onEvent('session_closed', handleSessionClosed);
+        onEvent('skip_update', handleSkipUpdate);
+        onEvent('track_skipped', handleTrackSkipped);
+        onEvent('session_ready', handleSessionReady);
+        onEvent('preparation_progress', handlePrepProgress);
+      };
+
+      connectSocket();
       
       return () => disconnectWebSocket();
     }
@@ -69,6 +79,24 @@ export const SessionProvider = ({ children }) => {
     setCurrentTrack(null);
   };
 
+  const handleSkipUpdate = (data) => {
+    setSkipData({ currentVotes: data.currentVotes, threshold: data.threshold });
+  };
+
+  const handleTrackSkipped = (data) => {
+    console.log('Track skipped:', data.message);
+    setSkipData({ currentVotes: 0, threshold: 0 });
+    // Le refresh se fera via queue_updated ou polling si nécessaire
+  };
+
+  const handleSessionReady = (data) => {
+    setCurrentSession(prev => prev ? { ...prev, status: 'active' } : null);
+  };
+
+  const handlePrepProgress = (data) => {
+    setPrepProgress({ count: data.count, needed: data.needed });
+  };
+
   return (
     <SessionContext.Provider
       value={{
@@ -77,7 +105,9 @@ export const SessionProvider = ({ children }) => {
         currentTrack,
         setCurrentTrack,
         votes,
-        participants
+        participants,
+        skipData,
+        prepProgress
       }}
     >
       {children}
