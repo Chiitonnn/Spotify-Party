@@ -27,7 +27,7 @@ const AppNavigator = () => {
       <Stack.Screen 
         name="Home" 
         component={HomeScreen}
-        options={{ title: 'Spotify Party' }}
+        options={{ title: 'Spotify Party', headerShown: false }}
         
       />
       <Stack.Screen 
