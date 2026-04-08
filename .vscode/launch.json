@@ -1,0 +1,31 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "🚀 Lancer Backend (API)",
+      "skipFiles": ["<node_internals>/**"],
+      "program": "${workspaceFolder}/backend/server.js",
+      "cwd": "${workspaceFolder}/backend",
+      "envFile": "${workspaceFolder}/backend/.env"
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "💻 Client Mobile (Expo)",
+      "command": "npx expo start --tunnel",
+      "cwd": "${workspaceFolder}/mobile"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "🔥 Launch All (Root script)",
+      "configurations": [],
+      "presentation": {
+        "hidden": false,
+        "group": "all"
+      }
+    }
+  ]
+}

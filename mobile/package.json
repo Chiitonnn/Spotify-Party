@@ -47,7 +47,8 @@
     "react-native-swipe-gestures": "^1.0.5",
     "react-native-web": "~0.21.0",
     "react-native-worklets": "0.5.1",
-    "socket.io-client": "^4.8.1"
+    "socket.io-client": "^4.8.1",
+    "spotify-party-root": "file:.."
   },
   "devDependencies": {
     "@types/react": "~19.1.0",

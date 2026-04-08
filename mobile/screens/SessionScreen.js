@@ -79,7 +79,7 @@ const TOP_H = height * 0.42;
 
 const SessionScreen = ({ navigation, route }) => {
   const { user } = useAuth();
-  const { currentSession, setCurrentSession, skipData, prepProgress } = useSession(); // ← ajout de ton pote
+  const { currentSession, setCurrentSession, skipData, prepProgress } = useSession();
   const { sessionId } = route.params;
   const [starting, setStarting] = useState(false);
   const insets = useSafeAreaInsets();
@@ -97,10 +97,7 @@ const SessionScreen = ({ navigation, route }) => {
 
   useEffect(() => {
     loadSession();
-    // ⚡ NOUVEAUTÉ : Plus de polling HTTP `setInterval` ici !
-    // Le système est maintenant 100% Temps Réel grâce aux WebSockets connectés dans le SessionContext.
-
-    // On garde l'écouteur de focus pour forcer un refresh quand on revient de l'écran de recherche
+    // Refresh session quand on revient de l'écran de recherche
     const unsubscribe = navigation.addListener('focus', loadSession);
     return () => { unsubscribe(); };
   }, [navigation, sessionId]);
@@ -140,7 +137,6 @@ const SessionScreen = ({ navigation, route }) => {
     }
   };
 
-  // ← ajout de ton pote
   const handleSkip = async () => {
     try {
       await SessionService.submitVote(sessionId, {
@@ -251,7 +247,7 @@ const SessionScreen = ({ navigation, route }) => {
           </Svg>
         </View>
 
-        {/* 🟢 MODE PRÉPARATION — ajout de ton pote, reskinné nouvelle UI */}
+        {/* 🟢 MODE PRÉPARATION */}
         {currentSession.status === 'preparing' && (
           <View style={styles.prepCard}>
             <View style={styles.prepCardHeader}>
@@ -275,7 +271,7 @@ const SessionScreen = ({ navigation, route }) => {
           </View>
         )}
 
-        {/* 🟠 MODE VOTE / SKIP — ajout de ton pote, reskinné nouvelle UI */}
+        {/* 🟠 MODE VOTE / SKIP */}
         {currentSession.mode === 'vote' && currentSession.status === 'active' && (
           <View style={styles.skipCard}>
             <Text style={styles.skipLabel}>VOTE EN COURS · SKIP ?</Text>

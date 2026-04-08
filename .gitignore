@@ -12,9 +12,14 @@ yarn-error.log*
 *.env
 ngrok.yml
 
-# Logs
+# Logs (y compris les logs générés par les scripts de démarrage)
 logs/
 *.log
+backend_server.log
+cf_mobile.log
+cf_backend.log
+cloudflare_*.log
+ngrok_backend.log
 
 # OS files
 .DS_Store
@@ -26,7 +31,6 @@ ehthumbs.db
 Thumbs.db
 
 # IDE
-.vscode/
 .idea/
 *.swp
 *.swo
@@ -51,20 +55,6 @@ mobile/*.p12
 mobile/*.key
 mobile/*.mobileprovision
 mobile/*.keystore
-
-# iOS
-mobile/ios/Pods/
-mobile/ios/build/
-mobile/ios/*.xcworkspace
-!mobile/ios/default.xcworkspace
-mobile/ios/xcuserdata/
-mobile/ios/DerivedData/
-
-# Android
-mobile/android/app/build/
-mobile/android/build/
-mobile/android/.gradle/
-mobile/android/local.properties
 
 # Backend specific
 backend/uploads/

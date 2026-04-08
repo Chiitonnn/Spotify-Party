@@ -6,7 +6,6 @@ import { handleSpotifyCallback } from '../services/auth.service.js';
 export const login = (req, res) => {
   try {
     const { platform = 'web', callbackUrl } = req.query;
-    console.log('🔐 [LOGIN] platform:', platform, '| callbackUrl:', callbackUrl);
 
     const state = Buffer.from(JSON.stringify({
       platform,
@@ -16,15 +15,13 @@ export const login = (req, res) => {
     const spotifyApi = createSpotifyApi();
     const authURL = spotifyApi.createAuthorizeURL(SPOTIFY_SCOPES, state, true);
 
-    console.log('✅ [LOGIN] Auth URL generated');
     res.json({ authUrl: authURL });
   } catch (error) {
-    console.error('❌ [LOGIN] Error:', error.message);
+    console.error('Login error:', error.message);
     res.status(500).json({ error: error.message });
   }
 };
 
-// 🆕 FONCTION MODIFIÉE : Version Robuste
 export const exchangeCode = async (req, res) => {
   const { code, redirectUri } = req.body;
 
@@ -36,7 +33,7 @@ export const exchangeCode = async (req, res) => {
     const result = await handleSpotifyCallback(code, redirectUri);
     res.json(result);
   } catch (error) {
-    console.error('❌ [EXCHANGE] Error:', error.message);
+    console.error('Exchange code error:', error.message);
     res.status(500).json({
       error: 'Authentication failed',
       details: error.message
@@ -57,7 +54,7 @@ export const callback = async (req, res) => {
       if (stateData.platform === 'web') isWeb = true;
     }
   } catch (e) {
-    console.warn('⚠️ [CALLBACK] Could not parse state for redirect:', e.message);
+    console.warn('Could not parse OAuth state:', e.message);
   }
 
   const getFinalRedirect = (params = {}) => {
@@ -84,26 +81,21 @@ export const callback = async (req, res) => {
 
   try {
     const result = await handleSpotifyCallback(code);
-    
     const finalUrl = getFinalRedirect({
       token: result.token,
       userId: result.user.id.toString()
     });
-
     res.redirect(finalUrl);
   } catch (error) {
-    console.error('❌ [CALLBACK] Global error:', error.message);
+    console.error('Callback error:', error.message);
     res.redirect(getFinalRedirect({ error: error.message }));
   }
 };
 
 export const refreshToken = async (req, res) => {
   try {
-    console.log('🔄 [REFRESH] Refreshing token for user:', req.userId);
-
     const user = await User.findById(req.userId);
     if (!user || !user.spotifyRefreshToken) {
-      console.error('❌ [REFRESH] No refresh token found');
       return res.status(401).json({ error: 'No refresh token' });
     }
 
@@ -116,31 +108,25 @@ export const refreshToken = async (req, res) => {
 
     await user.save();
 
-    console.log('✅ [REFRESH] Token refreshed successfully');
     res.json({
       accessToken: data.body.access_token,
       expiresIn: data.body.expires_in
     });
   } catch (error) {
-    console.error('❌ [REFRESH] Error:', error.message);
+    console.error('Refresh token error:', error.message);
     res.status(500).json({ error: error.message });
   }
 };
 
 export const getCurrentUser = async (req, res) => {
   try {
-    console.log('👤 [GET_USER] Fetching user:', req.userId);
-
     const user = await User.findById(req.userId).select('-spotifyAccessToken -spotifyRefreshToken');
     if (!user) {
-      console.error('❌ [GET_USER] User not found');
       return res.status(404).json({ error: 'User not found' });
     }
-
-    console.log('✅ [GET_USER] User found:', user.displayName);
     res.json(user);
   } catch (error) {
-    console.error('❌ [GET_USER] Error:', error.message);
+    console.error('Get user error:', error.message);
     res.status(500).json({ error: error.message });
   }
 };

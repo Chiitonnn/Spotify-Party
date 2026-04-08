@@ -3,14 +3,13 @@ import User from '../models/User.js';
 import { generateToken } from './token.service.js';
 
 /**
- * Handles the Spotify code exchange, profile fetching, and user database sync.
- * @param {string} code - The Spotify authorization code
- * @param {string} [redirectUri] - Optional redirect URI (mostly for mobile callbacks)
- * @returns {Promise<{token: string, user: Object}>} The JWT and User Profile
+ * Handles Spotify code exchange, profile fetching, and user DB sync.
+ * Profile fetch is non-blocking — if it fails, a placeholder user is assigned
+ * so the login flow can still complete successfully.
  */
 export const handleSpotifyCallback = async (code, redirectUri) => {
   const spotifyApi = createSpotifyApi();
-  
+
   if (redirectUri) {
     spotifyApi.setRedirectURI(redirectUri);
   }
@@ -19,7 +18,6 @@ export const handleSpotifyCallback = async (code, redirectUri) => {
   let data;
   try {
     data = await spotifyApi.authorizationCodeGrant(code);
-    console.log('✅ [AUTH.SERVICE] Token exchange successful');
   } catch (err) {
     throw new Error(err.body?.error_description || err.message || 'Spotify authentication failed');
   }
@@ -29,14 +27,13 @@ export const handleSpotifyCallback = async (code, redirectUri) => {
 
   spotifyApi.setAccessToken(access_token);
 
-  // 2. Fetch user profile robustly
+  // 2. Fetch user profile (non-blocking — falls back to defaults on failure)
   let profileBody = {};
   try {
     const profileData = await spotifyApi.getMe();
     profileBody = profileData.body;
-    console.log('✅ [AUTH.SERVICE] Profile received:', profileBody.display_name);
   } catch (profileError) {
-    console.warn('⚠️ [AUTH.SERVICE] Could not fetch Spotify profile details, using defaults.', profileError.message);
+    console.warn('Could not fetch Spotify profile, using placeholder:', profileError.message);
     profileBody = {
       id: 'unknown_user_' + Math.floor(Math.random() * 1000000),
       display_name: 'Utilisateur Spotify',
@@ -46,9 +43,9 @@ export const handleSpotifyCallback = async (code, redirectUri) => {
     };
   }
 
-  // 3. Sync User in Database
+  // 3. Sync user in database
   const spotifyId = profileBody.id || 'unknown';
-  let user = await User.findOne({ spotifyId: spotifyId });
+  let user = await User.findOne({ spotifyId });
 
   if (user) {
     user.spotifyAccessToken = access_token;
@@ -62,7 +59,7 @@ export const handleSpotifyCallback = async (code, redirectUri) => {
     }
   } else {
     user = new User({
-      spotifyId: spotifyId,
+      spotifyId,
       displayName: profileBody.display_name || 'Utilisateur',
       email: profileBody.email,
       spotifyAccessToken: access_token,
@@ -74,7 +71,6 @@ export const handleSpotifyCallback = async (code, redirectUri) => {
   }
 
   await user.save();
-  console.log('✅ [AUTH.SERVICE] User saved successfully:', user._id);
 
   // 4. Generate internal JWT
   const jwtToken = generateToken(user._id);

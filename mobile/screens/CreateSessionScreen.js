@@ -39,7 +39,7 @@ const BackArrow = () => (
 const CreateSessionScreen = ({ navigation }) => {
   const { setCurrentSession } = useSession();
   const [sessionName, setSessionName] = useState('');
-  const [mode, setMode] = useState('classic'); // ← ajout de ton pote
+  const [mode, setMode] = useState('classic'); 
   const [loading, setLoading] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
@@ -77,7 +77,7 @@ const CreateSessionScreen = ({ navigation }) => {
       setLoading(true);
       const session = await SessionService.createSession({
         name: sessionName,
-        mode: mode, // ← ajout de ton pote
+        mode: mode, 
         playlistIds: [],
         votingThreshold: 1,
         trackLimit: 50,
@@ -160,7 +160,7 @@ const CreateSessionScreen = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Mode de jeu ← ajout de ton pote, reskinné dans la nouvelle UI */}
+        {/* Mode de jeu */}
         <View style={styles.formGroup}>
           <Text style={styles.mLabel}>Mode de jeu</Text>
           <View style={styles.modeContainer}>

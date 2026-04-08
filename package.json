@@ -4,19 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev:backend": "cd backend && npm run dev",
-    "dev:frontend": "cd frontend && npm run dev",
-    "tunnel": "npx cloudflared tunnel --url http://localhost:3000",
+    "dev:backend": "npm run dev --prefix backend",
     "start:all": "powershell -ExecutionPolicy Bypass -File ./scripts/start-all.ps1",
     "start:mobile": "powershell -ExecutionPolicy Bypass -File ./scripts/start-mobile-tunnel.ps1",
-    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
-    "start": "npm run dev"
+    "dev": "npm run dev:backend",
+    "start": "npm run start:all"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"
-  },
-  "dependencies": {
-    "expo": "~54.0.27",
-    "expo-linear-gradient": "~15.0.8"
   }
 }
