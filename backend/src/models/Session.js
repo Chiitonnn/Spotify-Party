@@ -75,6 +75,7 @@ const sessionSchema = new mongoose.Schema({
     name: String,
     artists: [String],
     albumImage: String,
+    addedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     addedAt: { type: Date, default: Date.now }
   }],
   votingThreshold: {

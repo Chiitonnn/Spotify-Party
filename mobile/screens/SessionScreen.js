@@ -463,9 +463,16 @@ const SessionScreen = ({ navigation, route }) => {
           )}
 
           {currentSession.isPartyStarted && !isHost && (
-            <View style={styles.playingNotice}>
-              <EqBars />
-              <Text style={styles.playingNoticeText}>Lecture synchronisée (Temps Réel)</Text>
+            <View style={styles.guestControls}>
+              <View style={styles.playingNoticeSmall}>
+                <EqBars />
+                <Text style={styles.playingNoticeTextSmall}>Synchro</Text>
+              </View>
+              <TouchableOpacity style={styles.btnPass} onPress={handleSkip} activeOpacity={0.88}>
+                <Text style={styles.btnPassText}>
+                  Voter pour passer ⏭️ {skipData.threshold > 0 ? `(${skipData.currentVotes}/${skipData.threshold})` : ''}
+                </Text>
+              </TouchableOpacity>
             </View>
           )}
         </View>
@@ -664,13 +671,32 @@ const styles = StyleSheet.create({
   },
   btnPlayText: { fontFamily: 'Outfit_700Bold', fontSize: 13 * S, letterSpacing: 13 * S * 0.03, color: '#000' },
 
-  playingNotice: {
-    width: '100%', backgroundColor: 'rgba(29,185,84,0.1)',
+  playingNoticeSmall: {
+    backgroundColor: 'rgba(29,185,84,0.1)',
     borderWidth: 1, borderColor: 'rgba(29,185,84,0.3)',
-    borderRadius: 100, paddingVertical: 12 * S,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 * S,
+    borderRadius: 100, paddingHorizontal: 16 * S, paddingVertical: 8 * S,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 * S,
   },
-  playingNoticeText: { fontFamily: 'Outfit_700Bold', fontSize: 12 * S, color: '#1DB954' },
+  playingNoticeTextSmall: { fontFamily: 'Outfit_700Bold', fontSize: 10 * S, color: '#1DB954' },
+
+  guestControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    gap: 12 * S,
+  },
+  btnPass: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 100,
+    paddingVertical: 12 * S,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)'
+  },
+  btnPassText: {
+    color: '#FFF', fontFamily: 'Outfit_600SemiBold', fontSize: 12 * S
+  },
 
   currentTrackWrap: {
     marginBottom: 8 * S,

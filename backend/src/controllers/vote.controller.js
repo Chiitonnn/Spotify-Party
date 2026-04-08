@@ -25,28 +25,43 @@ export const submitVote = async (req, res) => {
     
     // 3. Cas particulier : Vote pour PASSER la musique en cours (Skip)
     if (voteType === 'skip') {
+      const currentTrackLocal = session.currentTrackId || 'current';
       const vote = await Vote.findOneAndUpdate(
-        { sessionId, userId: req.userId, trackId: session.currentTrackId || 'current' },
+        { sessionId, userId: req.userId, trackId: currentTrackLocal },
         { voteType: 'skip' },
         { upsert: true, new: true }
       );
 
       const skipVotes = await Vote.find({ 
         sessionId, 
-        trackId: session.currentTrackId || 'current', 
+        trackId: currentTrackLocal, 
         voteType: 'skip' 
       });
 
+      const requiredVotes = Math.max(1, Math.ceil(session.participants.length / 2));
       const io = getIO();
+      
       io.to(sessionId).emit('skip_update', {
         currentVotes: skipVotes.length,
-        threshold: Math.ceil(session.participants.length / 2) // Majorité simple pour skip
+        threshold: requiredVotes
       });
 
-      if (skipVotes.length >= Math.ceil(session.participants.length / 2)) {
+      if (skipVotes.length >= requiredVotes) {
         io.to(sessionId).emit('track_skipped', { message: 'La majorité a voté pour passer !' });
+        
+        // --- VRAI SOT DE PISTE EN TEMPS RÉEL VIA LE "CERVEAU" ---
+        try {
+          if (session.approvedQueue.length > 1) {
+            const spotifyApi = createSpotifyApi(session.hostId.spotifyAccessToken);
+            const nextTrack = session.approvedQueue[1];
+            await spotifyApi.play({ uris: [nextTrack.uri] });
+          }
+        } catch (spotifyError) {
+          console.error("Erreur Skip Collaboratif API:", spotifyError);
+        }
+
         // On nettoie les votes de skip pour la prochaine
-        await Vote.deleteMany({ sessionId, trackId: session.currentTrackId || 'current', voteType: 'skip' });
+        await Vote.deleteMany({ sessionId, trackId: currentTrackLocal, voteType: 'skip' });
       }
 
       return res.json({ message: 'Vote skip enregistré' });

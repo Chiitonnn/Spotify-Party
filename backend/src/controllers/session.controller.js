@@ -233,8 +233,17 @@ export const startParty = async (req, res) => {
       return res.status(404).json({ error: 'Ouvrez Spotify sur votre téléphone et lancez une musique.' });
     }
 
+    // --- MAGIE DU SHUFFLE COLLABORATIF ---
+    // On mélange le tableau de pistes avec Fisher-Yates
+    for (let i = session.approvedQueue.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [session.approvedQueue[i], session.approvedQueue[j]] = [session.approvedQueue[j], session.approvedQueue[i]];
+    }
+    // On sauvegarde ce nouvel ordre en base
+    // -------------------------------------
+
     const uris = session.approvedQueue.map(track => track.uri);
-    console.log(`🚀 Lancement soirée sur ${targetDevice.name}...`);
+    console.log(`🚀 Lancement soirée aléatoire sur ${targetDevice.name}...`);
 
     try {
       if (!targetDevice.is_active) {
@@ -258,6 +267,8 @@ export const startParty = async (req, res) => {
       startPlaybackPolling(session._id.toString(), session.hostId.toString());
 
       const io = getIO();
+      // On prévient tout le monde de l'état ET du nouvel ordre de la file
+      io.to(session._id.toString()).emit('queue_updated', session.approvedQueue);
       io.to(session._id.toString()).emit('party_started');
 
       res.json({ message: 'Party started!', count: uris.length });
@@ -290,11 +301,22 @@ export const addTrackToQueue = async (req, res) => {
 
     console.log(`📡 Ajout à la file : ${trackName} par l'utilisateur ${req.userId}`);
 
+    // --- LIMITE 10 MUSIQUES PAR PERSONNE ---
+    const userTrackCount = session.approvedQueue.filter(
+      track => track.addedBy && track.addedBy.toString() === req.userId
+    ).length;
+
+    if (userTrackCount >= 10) {
+      return res.status(403).json({ error: 'Vous avez atteint votre limite de 10 musiques !' });
+    }
+    // ---------------------------------------
+
     session.approvedQueue.push({
       uri: trackUri,
       name: trackName,
       artist: artistName,
       albumImage: albumImage || null,
+      addedBy: req.userId
     });
 
     await session.save();
