@@ -128,9 +128,14 @@ const SessionScreen = ({ navigation, route }) => {
 
   const handleDragEnd = async ({ data }) => {
     if (!isHost) return;
-    setCurrentSession({ ...currentSession, approvedQueue: data });
+    
+    const isStarted = currentSession?.isPartyStarted;
+    const currentTrack = isStarted && currentSession.approvedQueue?.length > 0 ? currentSession.approvedQueue[0] : null;
+    const newFullQueue = isStarted ? [currentTrack, ...data] : data;
+
+    setCurrentSession({ ...currentSession, approvedQueue: newFullQueue });
     try {
-      await SessionService.updateQueueOrder(sessionId, data);
+      await SessionService.updateQueueOrder(sessionId, newFullQueue);
     } catch {
       Alert.alert('Erreur', 'Impossible de sauvegarder l\'ordre.');
       loadSession();
@@ -170,7 +175,12 @@ const SessionScreen = ({ navigation, route }) => {
   };
 
   if (!currentSession) return <View style={styles.container} />;
-  const queue = currentSession.approvedQueue || [];
+  
+  const isStarted = currentSession.isPartyStarted;
+  const fullQueue = currentSession.approvedQueue || [];
+  const currentTrack = isStarted && fullQueue.length > 0 ? fullQueue[0] : null;
+  const draggableQueue = isStarted ? fullQueue.slice(1) : fullQueue;
+
   const topPaddingTop = Math.max(46 * S, insets.top + 8);
 
   return (
@@ -298,16 +308,16 @@ const SessionScreen = ({ navigation, route }) => {
         <View style={styles.queueHeader}>
           <Text style={styles.queueTitle}>
             File d'attente{' '}
-            <Text style={styles.queueCount}>({queue.length})</Text>
+            <Text style={styles.queueCount}>({fullQueue.length})</Text>
           </Text>
-          {isHost && queue.length > 1 && (
+          {isHost && draggableQueue.length > 1 && (
             <Text style={styles.queueHint}>Maintenez pour réorganiser</Text>
           )}
         </View>
 
         {/* Queue list */}
         <DraggableFlatList
-          data={queue}
+          data={draggableQueue}
           keyExtractor={(item, index) => `${item.uri}-${index}`}
           contentContainerStyle={[
             styles.queueList,
@@ -316,24 +326,44 @@ const SessionScreen = ({ navigation, route }) => {
           showsVerticalScrollIndicator={false}
           onDragEnd={handleDragEnd}
           activationDistance={isHost ? 10 : 999}
-          ListEmptyComponent={
-            <View style={styles.emptyWrap}>
-              <Text style={styles.emptyIcon}>🎵</Text>
-              <Text style={styles.emptyText}>La file d'attente est vide</Text>
-              <Text style={styles.emptySub}>Ajoutez vos premiers titres pour la soirée !</Text>
-            </View>
+          ListHeaderComponent={
+            <>
+              {currentTrack && (
+                <View style={styles.currentTrackWrap}>
+                  <View style={styles.currentTrackBadge}>
+                    <BlinkDot />
+                    <Text style={styles.currentTrackBadgeText}>EN COURS</Text>
+                  </View>
+                  <View style={[styles.trackRow, styles.trackRowPlaying]}>
+                    <Image source={{ uri: currentTrack.albumImage || 'https://via.placeholder.com/150' }} style={styles.trackCover} />
+                    <View style={styles.trackInfo}>
+                      <View style={styles.trackNameRow}>
+                        <Text style={[styles.trackName, styles.trackNamePlaying]} numberOfLines={1}>{currentTrack.name}</Text>
+                        <EqBars />
+                      </View>
+                      <Text style={styles.trackArtist} numberOfLines={1}>{currentTrack.artist}</Text>
+                    </View>
+                  </View>
+                </View>
+              )}
+              {fullQueue.length === 0 && (
+                <View style={styles.emptyWrap}>
+                  <Text style={styles.emptyIcon}>🎵</Text>
+                  <Text style={styles.emptyText}>La file d'attente est vide</Text>
+                  <Text style={styles.emptySub}>Ajoutez vos premiers titres pour la soirée !</Text>
+                </View>
+              )}
+            </>
           }
-          renderItem={({ item, index, drag, isActive }) => {
-            const isPlaying = index === 0;
+          renderItem={({ item, drag, isActive }) => {
             return (
               <ScaleDecorator>
                 <TouchableOpacity
-                  onLongPress={isHost && !(currentSession.isPartyStarted && index === 0) ? drag : undefined}
+                  onLongPress={isHost ? drag : undefined}
                   disabled={isActive}
                   activeOpacity={1}
                   style={[
                     styles.trackRow,
-                    isPlaying && styles.trackRowPlaying,
                     isActive && styles.trackRowDragging,
                   ]}
                 >
@@ -342,18 +372,10 @@ const SessionScreen = ({ navigation, route }) => {
                     style={styles.trackCover}
                   />
                   <View style={styles.trackInfo}>
-                    <View style={styles.trackNameRow}>
-                      <Text
-                        style={[styles.trackName, isPlaying && styles.trackNamePlaying]}
-                        numberOfLines={1}
-                      >
-                        {item.name}
-                      </Text>
-                      {isPlaying && <EqBars />}
-                    </View>
+                    <Text style={styles.trackName} numberOfLines={1}>{item.name}</Text>
                     <Text style={styles.trackArtist} numberOfLines={1}>{item.artist}</Text>
                   </View>
-                  {isHost && !(currentSession.isPartyStarted && index === 0) && <DragHandle />}
+                  {isHost && <DragHandle />}
                 </TouchableOpacity>
               </ScaleDecorator>
             );
@@ -603,6 +625,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 * S,
   },
   playingNoticeText: { fontFamily: 'Outfit_700Bold', fontSize: 12 * S, color: '#1DB954' },
+
+  currentTrackWrap: {
+    marginBottom: 8 * S,
+    paddingBottom: 8 * S,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  currentTrackBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 6 * S,
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(29,185,84,0.12)',
+    paddingHorizontal: 8 * S, paddingVertical: 3 * S,
+    borderRadius: 6 * S,
+    marginBottom: 6 * S, marginLeft: 6 * S,
+  },
+  currentTrackBadgeText: {
+    fontFamily: 'Outfit_700Bold', fontSize: 8 * S, letterSpacing: 8 * S * 0.1,
+    color: '#1DB954',
+  },
 });
 
 export default SessionScreen;
