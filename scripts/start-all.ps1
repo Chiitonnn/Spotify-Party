@@ -85,10 +85,9 @@ if (![string]::IsNullOrWhiteSpace($staticDomain) -and $backendUrl -notmatch $sta
 }
 
 # 3. Start Expo
-Write-Host "Starting Expo..." -ForegroundColor Cyan
-$env:EXPO_PACKAGER_PROXY_URL = $mobileUrl
+Write-Host "Starting Expo in TUNNEL mode (Accessible everywhere over 4G)..." -ForegroundColor Cyan
 Set-Location -Path "mobile"
-npx.cmd -y expo start --clear
+npx.cmd -y expo start --tunnel --clear
 
 # Cleanup
 if ($backendTunnelProcess) { Stop-Process -Id $backendTunnelProcess.Id -Force -ErrorAction SilentlyContinue }

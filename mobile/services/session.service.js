@@ -67,3 +67,12 @@ export const skipToPrevious = async (sessionId) => {
   const response = await api.post(`/sessions/${sessionId}/playback/previous`);
   return response.data;
 };
+
+export const submitVote = async (sessionId, voteData) => {
+  try {
+    const response = await api.post(`/votes/${sessionId}/vote`, voteData);
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};
