@@ -10,6 +10,10 @@ Remove-Item "ngrok_backend.log", "cf_mobile.log" -ErrorAction SilentlyContinue
 Write-Host "Starting Static Backend Tunnel (ngrok)..." -ForegroundColor Yellow
 $backendProcess = Start-Process "npx.cmd" -ArgumentList "ngrok", "http", "--domain=ripply-unconcentrated-lindy.ngrok-free.dev", "3000", "--log=stdout" -PassThru -NoNewWindow -RedirectStandardOutput "ngrok_backend.log"
 
+# 2.5 Start Actual Backend Server (Node.js)
+Write-Host "Starting Backend Server (Node.js)..." -ForegroundColor Yellow
+$serverProcess = Start-Process "npm.cmd" -ArgumentList "run", "dev" -WorkingDirectory "backend" -PassThru -NoNewWindow -RedirectStandardOutput "backend_server.log"
+
 # 3. Start Mobile Tunnel (Dynamic Cloudflare)
 Write-Host "Starting Dynamic Mobile Tunnel (Cloudflare)..." -ForegroundColor Yellow
 $mobileProcess = Start-Process "npx.cmd" -ArgumentList "cloudflared", "tunnel", "--url", "http://localhost:8081" -PassThru -NoNewWindow -RedirectStandardError "cf_mobile.log"
@@ -49,3 +53,4 @@ npx.cmd expo start --clear
 # Cleanup
 if ($backendProcess) { Stop-Process -Id $backendProcess.Id -Force -ErrorAction SilentlyContinue }
 if ($mobileProcess) { Stop-Process -Id $mobileProcess.Id -Force -ErrorAction SilentlyContinue }
+if ($serverProcess) { Stop-Process -Id $serverProcess.Id -Force -ErrorAction SilentlyContinue }

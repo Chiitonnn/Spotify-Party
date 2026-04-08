@@ -10,6 +10,10 @@ Remove-Item "cloudflare_out.log" -ErrorAction SilentlyContinue
 # Start cloudflared for port 8081 in the background
 $tunnelProcess = Start-Process "npx.cmd" -ArgumentList "cloudflared", "tunnel", "--url", "http://localhost:8081" -PassThru -NoNewWindow -RedirectStandardError "cloudflare_err.log" -RedirectStandardOutput "cloudflare_out.log"
 
+# Start Backend Server (Node.js)
+Write-Host "Starting Backend Server (Node.js)..." -ForegroundColor Yellow
+$serverProcess = Start-Process "npm.cmd" -ArgumentList "run", "dev" -WorkingDirectory "backend" -PassThru -NoNewWindow -RedirectStandardOutput "backend_server.log"
+
 Write-Host "Waiting for tunnel URL..." -ForegroundColor Yellow
 
 $tunnelUrl = ""
@@ -40,6 +44,7 @@ $env:EXPO_PACKAGER_PROXY_URL = $tunnelUrl
 Set-Location -Path "mobile"
 npx.cmd expo start --clear
 
-# Cleanup tunnel on exit
-Write-Host "Stopping tunnel..."
+# Cleanup tunnel and server on exit
+Write-Host "Stopping tunnel and server..."
 if ($tunnelProcess) { Stop-Process -Id $tunnelProcess.Id -Force }
+if ($serverProcess) { Stop-Process -Id $serverProcess.Id -Force }
