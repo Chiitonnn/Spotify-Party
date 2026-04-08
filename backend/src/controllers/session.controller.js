@@ -3,6 +3,7 @@ import User from '../models/User.js';
 import shortid from 'shortid';
 import { getIO } from '../services/websocket.service.js';
 import { createSpotifyApi } from '../config/spotify.js';
+import { startPlaybackPolling } from '../services/playback.service.js';
 
 export const createSession = async (req, res) => {
   try {
@@ -242,14 +243,19 @@ export const startParty = async (req, res) => {
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
 
+      // CHANGER ICI : On ne lance QUE la première musique ! Le reste sera géré par le cerveau (polling)
       await spotifyApi.play({ 
-        uris: uris, 
+        uris: [uris[0]], 
         device_id: targetDevice.id 
       });
 
       session.isPartyStarted = true;
-      session.currentTrackId = session.approvedQueue[0]?.trackId;
+      session.currentTrackId = uris[0];
+      session.nextTrackQueued = false;
       await session.save();
+
+      // Démarrage du cerveau de surveillance
+      startPlaybackPolling(session._id.toString(), session.hostId.toString());
 
       const io = getIO();
       io.to(session._id.toString()).emit('party_started');
@@ -290,16 +296,6 @@ export const addTrackToQueue = async (req, res) => {
       artist: artistName,
       albumImage: albumImage || null,
     });
-
-    if (session.isPartyStarted && session.hostId?.spotifyAccessToken) {
-      console.log(`🎵 Soirée déjà lancée, ajout dynamique sur Spotify de ${trackName} !`);
-      const spotifyApi = createSpotifyApi(session.hostId.spotifyAccessToken);
-      try {
-        await spotifyApi.addToQueue(trackUri);
-      } catch (spotifyErr) {
-        console.error('⚠️ Impossible d\'ajouter silencieusement à Spotify:', spotifyErr.message);
-      }
-    }
 
     await session.save();
 

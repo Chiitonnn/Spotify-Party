@@ -300,7 +300,7 @@ const SessionScreen = ({ navigation, route }) => {
             File d'attente{' '}
             <Text style={styles.queueCount}>({queue.length})</Text>
           </Text>
-          {isHost && queue.length > 1 && !currentSession.isPartyStarted && (
+          {isHost && queue.length > 1 && (
             <Text style={styles.queueHint}>Maintenez pour réorganiser</Text>
           )}
         </View>
@@ -328,7 +328,7 @@ const SessionScreen = ({ navigation, route }) => {
             return (
               <ScaleDecorator>
                 <TouchableOpacity
-                  onLongPress={isHost && !currentSession.isPartyStarted ? drag : undefined}
+                  onLongPress={isHost && !(currentSession.isPartyStarted && index === 0) ? drag : undefined}
                   disabled={isActive}
                   activeOpacity={1}
                   style={[
@@ -353,7 +353,7 @@ const SessionScreen = ({ navigation, route }) => {
                     </View>
                     <Text style={styles.trackArtist} numberOfLines={1}>{item.artist}</Text>
                   </View>
-                  {isHost && !currentSession.isPartyStarted && <DragHandle />}
+                  {isHost && !(currentSession.isPartyStarted && index === 0) && <DragHandle />}
                 </TouchableOpacity>
               </ScaleDecorator>
             );

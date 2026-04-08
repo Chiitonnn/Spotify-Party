@@ -78,6 +78,10 @@ const sessionSchema = new mongoose.Schema({
   isPartyStarted: {
     type: Boolean,
     default: false
+  },
+  nextTrackQueued: {
+    type: Boolean,
+    default: false
   }
 
 }, {
