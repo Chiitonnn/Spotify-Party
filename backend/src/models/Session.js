@@ -58,6 +58,16 @@ const sessionSchema = new mongoose.Schema({
     }
   }],
 
+  // 🆕 L'historique des musiques jouées (pour "précédent")
+  playedHistory: [{
+    trackId: String,
+    uri: String, 
+    name: String,
+    artists: [String],
+    albumImage: String,
+    playedAt: { type: Date, default: Date.now }
+  }],
+
   // 🆕 NOUVEAU : La file d'attente des musiques validées
   approvedQueue: [{
     trackId: String,
@@ -82,6 +92,10 @@ const sessionSchema = new mongoose.Schema({
   nextTrackQueued: {
     type: Boolean,
     default: false
+  },
+  isPlaying: {
+    type: Boolean,
+    default: true
   }
 
 }, {

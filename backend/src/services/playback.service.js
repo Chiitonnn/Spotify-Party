@@ -44,7 +44,17 @@ export const startPlaybackPolling = (sessionId, hostId) => {
       }
 
       // Aucun lecteur actif ou en pause
-      if (!playbackState || !playbackState.item || !playbackState.is_playing) {
+      const isPlayingSpotify = playbackState && playbackState.item && playbackState.is_playing;
+      
+      // Sync l'état de lecture
+      if (session.isPlaying !== isPlayingSpotify) {
+        session.isPlaying = isPlayingSpotify;
+        await session.save();
+        const io = getIO();
+        io.to(sessionId.toString()).emit('playback_state_changed', isPlayingSpotify);
+      }
+
+      if (!isPlayingSpotify) {
         return;
       }
 
@@ -62,8 +72,15 @@ export const startPlaybackPolling = (sessionId, hostId) => {
         // (L'app Spotify joue la suivante, donc on vire la N°1 de notre base)
         if (session.approvedQueue[0]?.uri === session.currentTrackId) {
             console.log(`🗑️ [Playback Cerveau] Dépilage de l'ancienne musique: ${session.approvedQueue[0].name}`);
-            session.approvedQueue.shift(); // On enlève la première de la file DB !
+            const playedTrack = session.approvedQueue.shift(); // On enlève la première de la file DB !
             
+            // On l'ajoute à l'historique
+            if (!session.playedHistory) session.playedHistory = [];
+            
+            // Pour éviter les bugs MongoDB mongoose limit
+            session.playedHistory.push(playedTrack);
+            if (session.playedHistory.length > 50) session.playedHistory.shift();
+
             // On diffuse la nouvelle file (amputée du titre passé) à tous les téléphones
             const io = getIO();
             io.to(sessionId.toString()).emit('queue_updated', session.approvedQueue);

@@ -334,3 +334,95 @@ export const updateQueueOrder = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+// ==========================================
+// CONTRÔLES DE LECTURE (Play/Pause, Skip, Prev)
+// ==========================================
+export const togglePlayPause = async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const session = await Session.findById(sessionId).populate('hostId');
+    if (!session || !session.isPartyStarted) return res.status(404).json({ error: 'Session non lancée' });
+
+    const spotifyApi = createSpotifyApi(session.hostId.spotifyAccessToken);
+    const playbackState = await spotifyApi.getMyCurrentPlaybackState();
+
+    if (playbackState?.body?.is_playing) {
+      await spotifyApi.pause();
+      session.isPlaying = false;
+    } else {
+      await spotifyApi.play();
+      session.isPlaying = true;
+    }
+    await session.save();
+
+    const io = getIO();
+    io.to(session._id.toString()).emit('playback_state_changed', session.isPlaying);
+
+    res.json({ message: 'Lecture togglée', isPlaying: session.isPlaying });
+  } catch (error) {
+    console.error('❌ Erreur togglePlayPause:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export const skipToNext = async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const session = await Session.findById(sessionId).populate('hostId');
+    if (!session || !session.isPartyStarted) return res.status(404).json({ error: 'Session non lancée' });
+
+    if (session.approvedQueue.length <= 1) {
+      return res.status(400).json({ error: 'Plus aucune musique dans la file !' });
+    }
+
+    const spotifyApi = createSpotifyApi(session.hostId.spotifyAccessToken);
+    
+    // On force la lecture du morceau suivant
+    const nextTrack = session.approvedQueue[1];
+    await spotifyApi.play({ uris: [nextTrack.uri] });
+
+    // Cerveau s'occupera d'archiver la musique 0!
+    
+    res.json({ message: 'Passage à la musique suivante !' });
+  } catch (error) {
+    console.error('❌ Erreur skipToNext:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export const skipToPrevious = async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const session = await Session.findById(sessionId).populate('hostId');
+    if (!session || !session.isPartyStarted) return res.status(404).json({ error: 'Session non lancée' });
+
+    if (!session.playedHistory || session.playedHistory.length === 0) {
+       // Rien dans l'historique : on restart
+       const spotifyApi = createSpotifyApi(session.hostId.spotifyAccessToken);
+       await spotifyApi.seek(0);
+       return res.json({ message: 'Retour au début' });
+    }
+
+    const spotifyApi = createSpotifyApi(session.hostId.spotifyAccessToken);
+
+    // On dépile la dernière musique de l'historique
+    const previousTrack = session.playedHistory.pop();
+    
+    // On la remet haut de la file
+    session.approvedQueue.unshift(previousTrack);
+    session.currentTrackId = previousTrack.uri;
+    await session.save();
+
+    // On force la lecture
+    await spotifyApi.play({ uris: [previousTrack.uri] });
+
+    const io = getIO();
+    io.to(session._id.toString()).emit('queue_updated', session.approvedQueue);
+
+    res.json({ message: 'Retour à la musique précédente !' });
+  } catch (error) {
+    console.error('❌ Erreur skipToPrevious:', error);
+    res.status(500).json({ error: error.message });
+  }
+};

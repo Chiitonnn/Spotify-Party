@@ -153,6 +153,24 @@ const SessionScreen = ({ navigation, route }) => {
     }
   };
 
+  const handleTogglePlay = async () => {
+    try { await SessionService.togglePlayPause(sessionId); } catch (e) {
+      Alert.alert('Erreur', e.error || 'Impossible de mettre en pause');
+    }
+  };
+
+  const handleSkipNext = async () => {
+    try { await SessionService.skipToNext(sessionId); } catch (e) {
+      Alert.alert('Erreur', e.error || 'Impossible de passer au suivant');
+    }
+  };
+
+  const handleSkipPrev = async () => {
+    try { await SessionService.skipToPrevious(sessionId); } catch (e) {
+      Alert.alert('Erreur', e.error || 'Impossible de revenir en arrière');
+    }
+  };
+
   const handleLeaveSession = () => {
     Alert.alert(
       'Quitter',
@@ -416,7 +434,35 @@ const SessionScreen = ({ navigation, route }) => {
             </TouchableOpacity>
           )}
 
-          {currentSession.isPartyStarted && (
+          {currentSession.isPartyStarted && isHost && (
+            <View style={styles.playbackControls}>
+              <TouchableOpacity style={styles.ctrlBtn} onPress={handleSkipPrev}>
+                <Svg width={16*S} height={16*S} viewBox="0 0 24 24" fill="#fff">
+                  <Path d="M19 20L9 12l10-8v16zM5 19V5h2v14H5z" />
+                </Svg>
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={styles.ctrlPlayBtn} onPress={handleTogglePlay}>
+                {currentSession.isPlaying ? (
+                  <Svg width={20*S} height={20*S} viewBox="0 0 24 24" fill="#000">
+                    <Path d="M6 4h4v16H6zM14 4h4v16h-4z" />
+                  </Svg>
+                ) : (
+                  <Svg style={{ marginLeft: 2 * S }} width={22*S} height={22*S} viewBox="0 0 24 24" fill="#000">
+                    <Path d="M6 4l15 8-15 8V4z" />
+                  </Svg>
+                )}
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={styles.ctrlBtn} onPress={handleSkipNext}>
+                <Svg width={16*S} height={16*S} viewBox="0 0 24 24" fill="#fff">
+                  <Path d="M5 4l10 8-10 8V4zM19 5v14h-2V5h2z" />
+                </Svg>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {currentSession.isPartyStarted && !isHost && (
             <View style={styles.playingNotice}>
               <EqBars />
               <Text style={styles.playingNoticeText}>Lecture synchronisée (Temps Réel)</Text>
@@ -643,6 +689,23 @@ const styles = StyleSheet.create({
   currentTrackBadgeText: {
     fontFamily: 'Outfit_700Bold', fontSize: 8 * S, letterSpacing: 8 * S * 0.1,
     color: '#1DB954',
+  },
+
+  playbackControls: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 24 * S,
+    paddingVertical: 4 * S,
+  },
+  ctrlBtn: {
+    width: 36 * S, height: 36 * S, borderRadius: 18 * S,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  ctrlPlayBtn: {
+    width: 48 * S, height: 48 * S, borderRadius: 24 * S,
+    backgroundColor: '#1DB954',
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#1DB954', shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35, shadowRadius: 18, elevation: 8,
   },
 });
 

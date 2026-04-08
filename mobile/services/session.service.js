@@ -52,3 +52,18 @@ export const updateQueueOrder = async (sessionId, newQueue) => {
     throw error.response?.data || error.message;
   }
 };
+
+export const togglePlayPause = async (sessionId) => {
+  const response = await api.post(`/sessions/${sessionId}/playback/toggle`);
+  return response.data;
+};
+
+export const skipToNext = async (sessionId) => {
+  const response = await api.post(`/sessions/${sessionId}/playback/next`);
+  return response.data;
+};
+
+export const skipToPrevious = async (sessionId) => {
+  const response = await api.post(`/sessions/${sessionId}/playback/previous`);
+  return response.data;
+};

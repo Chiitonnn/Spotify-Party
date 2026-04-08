@@ -29,6 +29,7 @@ export const SessionProvider = ({ children }) => {
         onEvent('session_ready', handleSessionReady);
         onEvent('preparation_progress', handlePrepProgress);
         onEvent('party_started', handlePartyStarted);
+        onEvent('playback_state_changed', handlePlaybackStateChanged);
       };
 
       connectSocket();
@@ -36,6 +37,10 @@ export const SessionProvider = ({ children }) => {
       return () => disconnectWebSocket();
     }
   }, [currentSession]);
+
+  const handlePlaybackStateChanged = (isPlaying) => {
+    setCurrentSession(prev => prev ? { ...prev, isPlaying } : null);
+  };
 
   const handlePartyStarted = () => {
     setCurrentSession(prev => prev ? { ...prev, isPartyStarted: true } : null);
