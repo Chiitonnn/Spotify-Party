@@ -68,14 +68,20 @@ if (Test-Path "cf_mobile.log") {
     }
 }
 
+# Choose color based on match with expected static domain
+$backendColor = "Yellow"
+if (![string]::IsNullOrWhiteSpace($staticDomain) -and $backendUrl -match $staticDomain) {
+    $backendColor = "Green"
+}
+
 Write-Host "`n--- NETWORKING STATUS ---" -ForegroundColor Cyan
-Write-Host "📍 Backend URL: $backendUrl" -ForegroundColor (if ($backendUrl -match "ripply") { "Green" } else { "Yellow" })
+Write-Host "📍 Backend URL: $backendUrl" -ForegroundColor $backendColor
 Write-Host "📍 Mobile URL : $mobileUrl" -ForegroundColor Green
 Write-Host "-------------------------`n" -ForegroundColor Cyan
 
-if ($backendUrl -notmatch "ripply") {
-    Write-Host "⚠️  ATTENTION: L'URL backend ne correspond pas au domaine statique." -ForegroundColor Red
-    Write-Host "Si tu as une erreur 404, c'est parce que tu n'as pas réservé ce domaine sur ton compte Ngrok." -ForegroundColor Red
+if (![string]::IsNullOrWhiteSpace($staticDomain) -and $backendUrl -notmatch $staticDomain) {
+    Write-Host "⚠️  ATTENTION: L'URL backend ne correspond pas au domaine configuré dans ton .env." -ForegroundColor Red
+    Write-Host "Vérifie tes identifiants Ngrok ou ta réservation de domaine." -ForegroundColor Red
 }
 
 # 3. Start Expo
