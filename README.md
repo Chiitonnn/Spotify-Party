@@ -65,4 +65,4 @@ Pour une meilleure expérience, ouvrez le projet dans VS Code :
 
 - `npm run dev` : Lance backend + frontal via concurrently (sans tunnels complexes).
 - `npm run tunnel` : Lance uniquement le tunnel Cloudflare par défaut.
-- `npm run start:mobile` : Lance uniquement le tunnel mobile Cloudflare.
+- `npm run start:mobile` : Lance uniquement le tunnel mobile Cloudflare. 
