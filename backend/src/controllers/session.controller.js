@@ -247,8 +247,12 @@ export const startParty = async (req, res) => {
         device_id: targetDevice.id 
       });
 
+      session.isPartyStarted = true;
       session.currentTrackId = session.approvedQueue[0]?.trackId;
       await session.save();
+
+      const io = getIO();
+      io.to(session._id.toString()).emit('party_started');
 
       res.json({ message: 'Party started!', count: uris.length });
 
@@ -275,19 +279,28 @@ export const addTrackToQueue = async (req, res) => {
     const { sessionId } = req.params;
     const { trackUri, trackName, artistName, albumImage } = req.body;
 
-    const session = await Session.findById(sessionId);
+    const session = await Session.findById(sessionId).populate('hostId');
     if (!session) return res.status(404).json({ error: 'Session introuvable' });
 
     console.log(`📡 Ajout à la file : ${trackName} par l'utilisateur ${req.userId}`);
 
-    // On sauvegarde uniquement en base — pas d'appel Spotify ici.
-    // L'appel Spotify se fait uniquement dans startParty, avec le token de l'hôte.
     session.approvedQueue.push({
       uri: trackUri,
       name: trackName,
       artist: artistName,
       albumImage: albumImage || null,
     });
+
+    if (session.isPartyStarted && session.hostId?.spotifyAccessToken) {
+      console.log(`🎵 Soirée déjà lancée, ajout dynamique sur Spotify de ${trackName} !`);
+      const spotifyApi = createSpotifyApi(session.hostId.spotifyAccessToken);
+      try {
+        await spotifyApi.addToQueue(trackUri);
+      } catch (spotifyErr) {
+        console.error('⚠️ Impossible d\'ajouter silencieusement à Spotify:', spotifyErr.message);
+      }
+    }
+
     await session.save();
 
     // On prévient tous les clients de la mise à jour de la file

@@ -28,6 +28,7 @@ export const SessionProvider = ({ children }) => {
         onEvent('track_skipped', handleTrackSkipped);
         onEvent('session_ready', handleSessionReady);
         onEvent('preparation_progress', handlePrepProgress);
+        onEvent('party_started', handlePartyStarted);
       };
 
       connectSocket();
@@ -35,6 +36,10 @@ export const SessionProvider = ({ children }) => {
       return () => disconnectWebSocket();
     }
   }, [currentSession]);
+
+  const handlePartyStarted = () => {
+    setCurrentSession(prev => prev ? { ...prev, isPartyStarted: true } : null);
+  };
 
   const handleVoteUpdate = (data) => {
     setVotes(prev => ({

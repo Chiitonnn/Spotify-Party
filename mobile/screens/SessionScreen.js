@@ -300,7 +300,7 @@ const SessionScreen = ({ navigation, route }) => {
             File d'attente{' '}
             <Text style={styles.queueCount}>({queue.length})</Text>
           </Text>
-          {isHost && queue.length > 1 && (
+          {isHost && queue.length > 1 && !currentSession.isPartyStarted && (
             <Text style={styles.queueHint}>Maintenez pour réorganiser</Text>
           )}
         </View>
@@ -328,7 +328,7 @@ const SessionScreen = ({ navigation, route }) => {
             return (
               <ScaleDecorator>
                 <TouchableOpacity
-                  onLongPress={isHost ? drag : undefined}
+                  onLongPress={isHost && !currentSession.isPartyStarted ? drag : undefined}
                   disabled={isActive}
                   activeOpacity={1}
                   style={[
@@ -353,7 +353,7 @@ const SessionScreen = ({ navigation, route }) => {
                     </View>
                     <Text style={styles.trackArtist} numberOfLines={1}>{item.artist}</Text>
                   </View>
-                  {isHost && <DragHandle />}
+                  {isHost && !currentSession.isPartyStarted && <DragHandle />}
                 </TouchableOpacity>
               </ScaleDecorator>
             );
@@ -372,7 +372,7 @@ const SessionScreen = ({ navigation, route }) => {
             <Text style={styles.btnAddText}>Ajouter un titre</Text>
           </TouchableOpacity>
 
-          {isHost && (
+          {isHost && !currentSession.isPartyStarted && (
             <TouchableOpacity
               style={[styles.btnPlay, starting && styles.btnPlayDisabled]}
               onPress={handleStartParty}
@@ -392,6 +392,13 @@ const SessionScreen = ({ navigation, route }) => {
                 </>
               )}
             </TouchableOpacity>
+          )}
+
+          {currentSession.isPartyStarted && (
+            <View style={styles.playingNotice}>
+              <EqBars />
+              <Text style={styles.playingNoticeText}>Lecture synchronisée (Temps Réel)</Text>
+            </View>
           )}
         </View>
 
@@ -588,6 +595,14 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   btnPlayText: { fontFamily: 'Outfit_700Bold', fontSize: 13 * S, letterSpacing: 13 * S * 0.03, color: '#000' },
+
+  playingNotice: {
+    width: '100%', backgroundColor: 'rgba(29,185,84,0.1)',
+    borderWidth: 1, borderColor: 'rgba(29,185,84,0.3)',
+    borderRadius: 100, paddingVertical: 12 * S,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 * S,
+  },
+  playingNoticeText: { fontFamily: 'Outfit_700Bold', fontSize: 12 * S, color: '#1DB954' },
 });
 
 export default SessionScreen;

@@ -74,9 +74,12 @@ const sessionSchema = new mongoose.Schema({
   isActive: {
     type: Boolean,
     default: true
+  },
+  isPartyStarted: {
+    type: Boolean,
+    default: false
   }
 
-  
 }, {
   timestamps: true
 });
