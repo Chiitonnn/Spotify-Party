@@ -30,7 +30,6 @@ export const createSession = async (req, res) => {
             uri: item.track.uri,
             artists: item.track.artists.map(a => a.name),
             albumImage: item.track.album.images?.[0]?.url || 'https://via.placeholder.com/300',
-            // On gère la preview ici directement
             preview_url: item.track.preview_url 
               ? item.track.preview_url 
               : 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3'
@@ -42,14 +41,12 @@ export const createSession = async (req, res) => {
     }
 
     // 2. MÉLANGE (SHUFFLE) 🎲
-    // Algorithme de Fisher-Yates pour bien mélanger
     for (let i = allTracks.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [allTracks[i], allTracks[j]] = [allTracks[j], allTracks[i]];
     }
 
     // 3. LIMITER (SLICE) ✂️
-    // On garde uniquement le nombre demandé (ex: 10)
     const limit = parseInt(trackLimit) || 20;
     const finalPool = allTracks.slice(0, limit);
 
@@ -62,7 +59,7 @@ export const createSession = async (req, res) => {
       playlistIds: playlistIds || [],
       votingThreshold: votingThreshold || 5,
       trackLimit: limit,
-      trackPool: finalPool, // 💾 On sauvegarde la sélection !
+      trackPool: finalPool,
       mode: mode || 'classic',
       status: mode === 'vote' ? 'preparing' : 'active',
       participants: [{
@@ -102,7 +99,6 @@ export const joinSession = async (req, res) => {
       });
       await session.save();
       
-      // Notifier via WebSocket
       const io = getIO();
       io.to(session._id.toString()).emit('user_joined', {
         userId: req.userId,
@@ -146,7 +142,6 @@ export const leaveSession = async (req, res) => {
       p => p.userId.toString() !== req.userId
     );
     
-    // Si l'hôte quitte, fermer la session
     if (session.hostId.toString() === req.userId) {
       session.isActive = false;
     }
@@ -226,7 +221,6 @@ export const startParty = async (req, res) => {
 
     const spotifyApi = createSpotifyApi(user.spotifyAccessToken);
 
-    // 1. Chercher les appareils
     const devicesData = await spotifyApi.getMyDevices();
     const devices = devicesData.body.devices;
     
@@ -242,22 +236,17 @@ export const startParty = async (req, res) => {
     console.log(`🚀 Lancement soirée sur ${targetDevice.name}...`);
 
     try {
-      // ⚡ Tentative de transfert
       if (!targetDevice.is_active) {
         console.log("💤 Appareil inactif, tentative de transfert...");
         await spotifyApi.transferMyPlayback([targetDevice.id]);
-        
-        // On attend 1 seconde complète pour laisser le réseau se faire
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
 
-      // 🎵 On lance la musique
       await spotifyApi.play({ 
         uris: uris, 
         device_id: targetDevice.id 
       });
 
-      // 💾 On track la première musique pour le système de vote Skip
       session.currentTrackId = session.approvedQueue[0]?.trackId;
       await session.save();
 
@@ -266,7 +255,6 @@ export const startParty = async (req, res) => {
     } catch (playError) {
       console.error('❌ Erreur de lecture Spotify:', playError.message);
       
-      // 👇 LE MESSAGE D'ERREUR ADAPTÉ À TA DÉCOUVERTE !
       if (playError.statusCode === 404 || playError.statusCode === 403 || playError.statusCode === 502) {
         return res.status(400).json({ 
           error: 'Astuce : Lancez d\'abord une musique manuellement sur votre application Spotify, mettez pause, puis cliquez sur "Lancer la Soirée" !' 
@@ -285,50 +273,28 @@ export const startParty = async (req, res) => {
 export const addTrackToQueue = async (req, res) => {
   try {
     const { sessionId } = req.params;
-    // L'invité envoie l'URI de la musique qu'il a choisie
-    const { trackUri, trackName, artistName } = req.body; 
+    const { trackUri, trackName, artistName, albumImage } = req.body;
 
     const session = await Session.findById(sessionId);
     if (!session) return res.status(404).json({ error: 'Session introuvable' });
 
-    // On récupère le compte Spotify de l'hôte
-    const host = await User.findById(session.hostId);
-    if (!host) return res.status(404).json({ error: 'Hôte introuvable' });
+    console.log(`📡 Ajout à la file : ${trackName} par l'utilisateur ${req.userId}`);
 
-    const spotifyApi = createSpotifyApi(host.spotifyAccessToken);
+    // On sauvegarde uniquement en base — pas d'appel Spotify ici.
+    // L'appel Spotify se fait uniquement dans startParty, avec le token de l'hôte.
+    session.approvedQueue.push({
+      uri: trackUri,
+      name: trackName,
+      artist: artistName,
+      albumImage: albumImage || null,
+    });
+    await session.save();
 
-    console.log(`📡 Demande d'ajout à la file d'attente : ${trackName} par l'utilisateur ${req.userId}`);
+    // On prévient tous les clients de la mise à jour de la file
+    const io = getIO();
+    io.to(session._id.toString()).emit('queue_updated', session.approvedQueue);
 
-    try {
-      // 🔥 LA COMMANDE MAGIQUE SPOTIFY API
-      await spotifyApi.addToQueue(trackUri);
-
-      // (Optionnel) On sauvegarde dans la base de données pour afficher l'historique sur l'app
-      session.approvedQueue.push({
-        uri: trackUri,
-        name: trackName,
-        artist: artistName,
-        // Tu pourras ajouter l'image de l'album ici plus tard
-      });
-      await session.save();
-
-      // ⚡ NOUVEAUTÉ : On prévient tous les clients de la mise à jour de la file !
-      const io = getIO();
-      io.to(session._id.toString()).emit('queue_updated', session.approvedQueue);
-
-      res.json({ message: 'Titre ajouté avec succès à la file d\'attente !' });
-
-    } catch (spotifyError) {
-      console.error('❌ Erreur AddToQueue Spotify:', spotifyError.message);
-      
-      // Si l'hôte a fermé son Spotify, on renvoie le message d'astuce
-      if (spotifyError.statusCode === 404 || spotifyError.statusCode === 403 || spotifyError.statusCode === 502) {
-        return res.status(400).json({ 
-          error: 'Le Spotify de l\'hôte est en veille. Dites-lui de lancer une musique !' 
-        });
-      }
-      throw spotifyError;
-    }
+    res.json({ message: 'Titre ajouté avec succès à la file d\'attente !' });
 
   } catch (error) {
     console.error('❌ Erreur serveur AddToQueue:', error);
@@ -344,7 +310,6 @@ export const updateQueueOrder = async (req, res) => {
     const session = await Session.findById(sessionId);
     if (!session) return res.status(404).json({ error: 'Session introuvable' });
 
-    // Seul l'hôte a le droit de réorganiser
     if (session.hostId.toString() !== req.userId) {
       return res.status(403).json({ error: 'Seul l\'hôte peut réorganiser la file.' });
     }
@@ -352,7 +317,6 @@ export const updateQueueOrder = async (req, res) => {
     session.approvedQueue = newQueue;
     await session.save();
 
-    // ⚡ NOUVEAUTÉ : On prévient tous les clients de la réorganisation de la file !
     const io = getIO();
     io.to(session._id.toString()).emit('queue_updated', session.approvedQueue);
 
