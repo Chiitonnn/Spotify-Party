@@ -82,11 +82,15 @@ const VoteScreen = ({ navigation, route }) => {
   const handleAddTrack = async (track) => {
     try {
       setAddingTrackId(track.id);
+      
+      // 🚀 C'EST ICI QU'ON AJOUTE L'IMAGE AU PAYLOAD
       await SessionService.addToQueue(sessionId, {
         trackUri: track.uri,
         trackName: track.name,
-        artistName: track.artists.join(', ')
+        artistName: track.artists.join(', '),
+        albumImage: track.albumImage // 👈 CETTE LIGNE MANQUAIT !
       });
+      
       Alert.alert('Succès ! 🎵', `${track.name} a été ajouté à la file.`);
     } catch (error) {
       Alert.alert('Oups', error.error || 'Impossible d\'ajouter la musique.');
@@ -94,7 +98,7 @@ const VoteScreen = ({ navigation, route }) => {
       setAddingTrackId(null);
     }
   };
-
+  
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />

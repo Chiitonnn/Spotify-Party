@@ -1,25 +1,88 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  FlatList,
-  Alert,
-  Share,
-  ActivityIndicator,
-  StatusBar
+  View, Text, TouchableOpacity, StyleSheet,
+  Alert, Share, ActivityIndicator, StatusBar, Image,
+  Dimensions, Animated,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import DraggableFlatList, { ScaleDecorator } from 'react-native-draggable-flatlist';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import Svg, { Circle, Path, Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import { useSession } from '../contexts/SessionContext';
 import * as SessionService from '../services/session.service';
 
+const { width, height } = Dimensions.get('window');
+const S = width / 320;
+
+/* ─── Dot pattern ─── */
+const DotPattern = ({ w, h }) => {
+  const spacing = 18 * S;
+  const dots = [];
+  const cols = Math.ceil(w / spacing) + 1;
+  const rows = Math.ceil(h / spacing) + 1;
+  for (let r = 0; r < rows; r++)
+    for (let c = 0; c < cols; c++)
+      dots.push(<Circle key={`${r}-${c}`} cx={c * spacing} cy={r * spacing} r={S} fill="rgba(0,0,0,0.1)" />);
+  return (
+    <Svg width={w} height={h} style={{ position: 'absolute', top: 0, left: 0 }} pointerEvents="none">
+      {dots}
+    </Svg>
+  );
+};
+
+/* ─── Croix SVG ─── */
+const CloseIcon = () => (
+  <Svg width={12 * S} height={12 * S} viewBox="0 0 12 12" fill="none">
+    <Path d="M1 1L11 11M11 1L1 11" stroke="rgba(0,0,0,0.5)" strokeWidth="1.8" strokeLinecap="round" />
+  </Svg>
+);
+
+/* ─── Dot clignotant ─── */
+const BlinkDot = () => {
+  const op = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    Animated.loop(Animated.sequence([
+      Animated.timing(op, { toValue: 0.3, duration: 800, useNativeDriver: true }),
+      Animated.timing(op, { toValue: 1,   duration: 800, useNativeDriver: true }),
+    ])).start();
+  }, []);
+  return <Animated.View style={[styles.statusDot, { opacity: op }]} />;
+};
+
+/* ─── EQ bars ─── */
+const EqBars = () => {
+  const bars = [0, 1, 2].map(() => useRef(new Animated.Value(3 * S)).current);
+  useEffect(() => {
+    bars.forEach((bar, i) => {
+      Animated.loop(Animated.sequence([
+        Animated.timing(bar, { toValue: 12 * S, duration: 400, delay: i * 130, useNativeDriver: false }),
+        Animated.timing(bar, { toValue: 3 * S,  duration: 400, useNativeDriver: false }),
+      ])).start();
+    });
+  }, []);
+  return (
+    <View style={styles.eqWrap}>
+      {bars.map((bar, i) => <Animated.View key={i} style={[styles.eqBar, { height: bar }]} />)}
+    </View>
+  );
+};
+
+/* ─── Drag handle ─── */
+const DragHandle = () => (
+  <View style={styles.dragHandle}>
+    {[0, 1, 2].map(i => <View key={i} style={styles.dragLine} />)}
+  </View>
+);
+
+const TOP_H = height * 0.42;
+
 const SessionScreen = ({ navigation, route }) => {
   const { user } = useAuth();
-  const { currentSession, setCurrentSession, skipData, prepProgress } = useSession();
+  const { currentSession, setCurrentSession, skipData, prepProgress } = useSession(); // ← ajout de ton pote
   const { sessionId } = route.params;
   const [starting, setStarting] = useState(false);
+  const insets = useSafeAreaInsets();
 
   const isHost = currentSession?.hostId?._id === user?._id || currentSession?.hostId === user?._id;
 
@@ -28,41 +91,27 @@ const SessionScreen = ({ navigation, route }) => {
       const session = await SessionService.getSession(sessionId);
       setCurrentSession(session);
     } catch (error) {
-      console.error("Erreur rafraîchissement session:", error);
+      console.error('Erreur rafraîchissement session:', error);
     }
   };
-  
-  useEffect(() => {
-    // Chargement initial immédiat au montage du composant
-    loadSession();
 
-    // ⚡ NOUVEAUTÉ : Plus de polling HTTP `setInterval` ici ! 
+  useEffect(() => {
+    loadSession();
+    // ⚡ NOUVEAUTÉ : Plus de polling HTTP `setInterval` ici !
     // Le système est maintenant 100% Temps Réel grâce aux WebSockets connectés dans le SessionContext.
 
     // On garde l'écouteur de focus pour forcer un refresh quand on revient de l'écran de recherche
-    const unsubscribe = navigation.addListener('focus', () => {
-      loadSession();
-    });
-
-    // Nettoyage complet : on enlève l'écouteur quand on quitte l'écran
-    return () => {
-      unsubscribe();
-    };
+    const unsubscribe = navigation.addListener('focus', loadSession);
+    return () => { unsubscribe(); };
   }, [navigation, sessionId]);
 
   const handleShareCode = async () => {
     try {
-      await Share.share({
-        message: `Rejoins ma session Spotify Party avec le code: ${currentSession.code}`
-      });
-    } catch (error) {
-      console.error(error);
-    }
+      await Share.share({ message: `Rejoins ma session Spotify Party avec le code: ${currentSession.code}` });
+    } catch (error) { console.error(error); }
   };
 
-  const handleAddTrack = () => {
-    navigation.navigate('Vote', { sessionId });
-  };
+  const handleAddTrack = () => navigation.navigate('Vote', { sessionId });
 
   const handleStartParty = async () => {
     if (!currentSession.approvedQueue || currentSession.approvedQueue.length === 0) {
@@ -80,48 +129,30 @@ const SessionScreen = ({ navigation, route }) => {
     }
   };
 
-  // 🔄 NOUVEAU : Fonction pour réorganiser la file
-  const moveTrack = async (index, direction) => {
-    if (!isHost) {
-      Alert.alert('Désolé', 'Seul l\'hôte peut réorganiser la file d\'attente.');
-      return;
-    }
-
-    const newQueue = [...currentSession.approvedQueue];
-    
-    // Logique d'échange
-    if (direction === 'up' && index > 0) {
-      [newQueue[index - 1], newQueue[index]] = [newQueue[index], newQueue[index - 1]];
-    } else if (direction === 'down' && index < newQueue.length - 1) {
-      [newQueue[index + 1], newQueue[index]] = [newQueue[index], newQueue[index + 1]];
-    } else {
-      return; // On ne fait rien si on est déjà tout en haut/bas
-    }
-
-    // 1. Mise à jour visuelle instantanée (Optimistic UI)
-    setCurrentSession({ ...currentSession, approvedQueue: newQueue });
-
-    // 2. Sauvegarde en base de données
+  const handleDragEnd = async ({ data }) => {
+    if (!isHost) return;
+    setCurrentSession({ ...currentSession, approvedQueue: data });
     try {
-      await SessionService.updateQueueOrder(sessionId, newQueue);
-    } catch (error) {
+      await SessionService.updateQueueOrder(sessionId, data);
+    } catch {
       Alert.alert('Erreur', 'Impossible de sauvegarder l\'ordre.');
-      loadSession(); // On annule en cas d'erreur
+      loadSession();
     }
   };
 
+  // ← ajout de ton pote
   const handleSkip = async () => {
     try {
-      await SessionService.submitVote(sessionId, { 
-        trackId: currentSession.currentTrackId || 'current', 
-        voteType: 'skip' 
+      await SessionService.submitVote(sessionId, {
+        trackId: currentSession.currentTrackId || 'current',
+        voteType: 'skip',
       });
     } catch (error) {
-      console.error("Erreur skip:", error);
+      console.error('Erreur skip:', error);
     }
   };
 
-  const handleLeaveSession = async () => {
+  const handleLeaveSession = () => {
     Alert.alert(
       'Quitter',
       isHost ? 'Fermer le salon pour tout le monde ?' : 'Voulez-vous quitter le salon ?',
@@ -135,9 +166,7 @@ const SessionScreen = ({ navigation, route }) => {
               if (isHost) await SessionService.closeSession(sessionId);
               else await SessionService.leaveSession(sessionId);
               navigation.navigate('Home');
-            } catch (error) {
-              Alert.alert('Erreur', 'Impossible de quitter');
-            }
+            } catch { Alert.alert('Erreur', 'Impossible de quitter'); }
           }
         }
       ]
@@ -145,210 +174,424 @@ const SessionScreen = ({ navigation, route }) => {
   };
 
   if (!currentSession) return <View style={styles.container} />;
-
   const queue = currentSession.approvedQueue || [];
+  const topPaddingTop = Math.max(46 * S, insets.top + 8);
 
   return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle="dark-content" backgroundColor="#1DB954" />
 
-      {/* HEADER */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.subtitle}>SALON EN COURS</Text>
-          <Text style={styles.title}>{currentSession.name}</Text>
-        </View>
-        <TouchableOpacity onPress={handleLeaveSession} style={styles.closeBtn}>
-          <Ionicons name="close" size={24} color="#FFF" />
-        </TouchableOpacity>
-      </View>
+      {/* ══════════════════════════════
+          TOP — vert 42%
+      ══════════════════════════════ */}
+      <View style={[styles.topHalf, { height: TOP_H, paddingTop: topPaddingTop }]}>
+        <DotPattern w={width} h={TOP_H} />
 
-      {/* CODE & STATS (Compacts) */}
-      <View style={styles.infoRow}>
-        <TouchableOpacity onPress={handleShareCode} style={styles.codeBadge}>
-          <Text style={styles.codeText}>{currentSession.code}</Text>
-          <Ionicons name="copy-outline" size={16} color="#1DB954" style={{marginLeft: 8}} />
-        </TouchableOpacity>
-        
-        <View style={styles.participantsBadge}>
-          <Ionicons name="people" size={16} color="#B3B3B3" />
-          <Text style={styles.participantsText}>{currentSession.participants?.length || 1} Invités</Text>
-        </View>
-      </View>
+        {/* deco-c1 */}
+        <View style={{ position: 'absolute', width: 220 * S, height: 220 * S, borderRadius: 110 * S, borderWidth: 44 * S, borderColor: 'rgba(255,255,255,0.07)', top: -80 * S, right: -70 * S }} />
+        {/* deco-c2 */}
+        <View style={{ position: 'absolute', width: 100 * S, height: 100 * S, borderRadius: 50 * S, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.12)', bottom: 18 * S, right: 20 * S }} />
 
-      {/* 🟢 MODE PRÉPARATION (Si actif) */}
-      {currentSession.status === 'preparing' && (
-        <View style={styles.prepCard}>
-          <View style={styles.prepInfo}>
-            <Ionicons name="time-outline" size={24} color="#1DB954" />
-            <Text style={styles.prepTitle}>Phase de préparation</Text>
+        {/* Header : status badge + close */}
+        <View style={styles.topHeader}>
+          <View style={styles.statusBadge}>
+            <BlinkDot />
+            <Text style={styles.statusText}>Session en cours</Text>
           </View>
-          <Text style={styles.prepText}>
-            Ajoutez des musiques pour lancer la soirée ! 
-            ({prepProgress.count || currentSession.approvedQueue?.length || 0} / 10)
-          </Text>
-          <View style={styles.progressBarBg}>
-            <View 
-              style={[
-                styles.progressBarFill, 
-                { width: `${Math.min(100, ((prepProgress.count || currentSession.approvedQueue?.length || 0) / 10) * 100)}%` }
-              ]} 
-            />
-          </View>
-        </View>
-      )}
-
-      {/* 🟠 MODE VOTE / SKIP (Si actif) */}
-      {currentSession.mode === 'vote' && currentSession.status === 'active' && (
-        <View style={styles.skipCard}>
-          <Text style={styles.skipLabel}>VOTE EN COURS : SKIP ?</Text>
-          <View style={styles.skipInfo}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.skipVotes}>
-                {skipData.currentVotes || 0} / {skipData.threshold || Math.ceil((currentSession.participants?.length || 1) / 2)} votes
-              </Text>
-              <Text style={styles.skipSub}>Majorité requise pour passer</Text>
-            </View>
-            <TouchableOpacity style={styles.skipBtn} onPress={handleSkip}>
-              <Ionicons name="play-skip-forward" size={24} color="#000" />
-              <Text style={styles.skipBtnText}>SKIP</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-
-      {/* FILE D'ATTENTE */}
-      <View style={styles.queueHeader}>
-        <Text style={styles.sectionTitle}>File d'attente ({queue.length})</Text>
-        {isHost && queue.length > 1 && (
-          <Text style={styles.queueSubtitle}>Vous pouvez réorganiser ↕️</Text>
-        )}
-      </View>
-
-      <FlatList
-        data={queue}
-        keyExtractor={(item, index) => `${item.uri}-${index}`}
-        style={styles.queueList}
-        ListEmptyComponent={
-          <View style={styles.emptyQueue}>
-            <Ionicons name="musical-notes-outline" size={40} color="#333" />
-            <Text style={styles.emptyText}>La file est vide.</Text>
-            <Text style={styles.emptySubtext}>Cherchez une musique pour commencer !</Text>
-          </View>
-        }
-        renderItem={({ item, index }) => (
-          <View style={styles.trackItem}>
-            {/* Numéro */}
-            <Text style={styles.trackIndex}>{index + 1}</Text>
-            
-            {/* Infos Musique */}
-            <View style={styles.trackInfo}>
-              <Text style={styles.trackName} numberOfLines={1}>{item.name}</Text>
-              <Text style={styles.trackArtist} numberOfLines={1}>{item.artist}</Text>
-            </View>
-
-            {/* Contrôles (Hôte uniquement) */}
-            {isHost && (
-              <View style={styles.trackControls}>
-                <TouchableOpacity 
-                  onPress={() => moveTrack(index, 'up')} 
-                  disabled={index === 0}
-                  style={styles.arrowBtn}
-                >
-                  <Ionicons name="chevron-up" size={24} color={index === 0 ? "#333" : "#FFF"} />
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  onPress={() => moveTrack(index, 'down')} 
-                  disabled={index === queue.length - 1}
-                  style={styles.arrowBtn}
-                >
-                  <Ionicons name="chevron-down" size={24} color={index === queue.length - 1 ? "#333" : "#FFF"} />
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-        )}
-      />
-
-      {/* FOOTER ACTIONS */}
-      <View style={styles.footer}>
-        <TouchableOpacity style={styles.searchButton} onPress={handleAddTrack}>
-          <Ionicons name="search" size={20} color="#FFF" />
-          <Text style={styles.searchButtonText}>Ajouter un titre</Text>
-        </TouchableOpacity>
-
-        {isHost && (
-          <TouchableOpacity
-            style={styles.startButton}
-            onPress={handleStartParty}
-            disabled={starting}
-          >
-            {starting ? (
-              <ActivityIndicator color="#000" />
-            ) : (
-              <>
-                <Text style={styles.startButtonText}>LANCER LA LECTURE</Text>
-                <Ionicons name="play" size={20} color="#000" />
-              </>
-            )}
+          <TouchableOpacity onPress={handleLeaveSession} style={styles.closeBtn}>
+            <CloseIcon />
           </TouchableOpacity>
+        </View>
+
+        {/* Hero : titre + pills */}
+        <View style={styles.topHero}>
+          <Text style={styles.mainTitle}>
+            <Text style={styles.titleBlack}>Spot</Text>
+            <Text style={styles.titleWhite}>ify{'\n'}</Text>
+            <Text style={styles.titleBlack}>Par</Text>
+            <Text style={styles.titleWhite}>ty</Text>
+          </Text>
+
+          {/* Pills row */}
+          <View style={styles.pillsRow}>
+            {/* Code pill */}
+            <TouchableOpacity onPress={handleShareCode} style={styles.pillCode}>
+              <Text style={styles.pillCodeText}>{currentSession.code}</Text>
+              <Text style={styles.pillCodeIcon}>⧉</Text>
+            </TouchableOpacity>
+
+            {/* Guests pill */}
+            <View style={styles.pillGuests}>
+              <Svg width={14 * S} height={11 * S} viewBox="0 0 16 12" fill="none">
+                <Path d="M10.5 1C10.5 1 12 1.5 12 3.5C12 5.5 10.5 6 10.5 6" stroke="rgba(0,0,0,0.5)" strokeWidth="1.2" strokeLinecap="round" />
+                <Circle cx="5.5" cy="3.5" r="2.5" stroke="rgba(0,0,0,0.5)" strokeWidth="1.2" />
+                <Path d="M1 11C1 9.343 3.015 8 5.5 8C7.985 8 10 9.343 10 11" stroke="rgba(0,0,0,0.5)" strokeWidth="1.2" strokeLinecap="round" />
+              </Svg>
+              <Text style={styles.pillGuestsText}>{currentSession.participants?.length || 1} Invités</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+
+      {/* ══════════════════════════════
+          BOT — noir flex 1
+      ══════════════════════════════ */}
+      <View style={styles.botHalf}>
+        {/* Glow */}
+        <View style={{ position: 'absolute', top: -28 * S, alignSelf: 'center' }} pointerEvents="none">
+          <Svg width={260 * S} height={56 * S}>
+            <Defs>
+              <RadialGradient id="g" cx="50%" cy="0%" rx="50%" ry="100%">
+                <Stop offset="0%" stopColor="#1DB954" stopOpacity="0.18" />
+                <Stop offset="100%" stopColor="#1DB954" stopOpacity="0" />
+              </RadialGradient>
+            </Defs>
+            <Rect x="0" y="0" width={260 * S} height={56 * S} fill="url(#g)" />
+          </Svg>
+        </View>
+
+        {/* 🟢 MODE PRÉPARATION — ajout de ton pote, reskinné nouvelle UI */}
+        {currentSession.status === 'preparing' && (
+          <View style={styles.prepCard}>
+            <View style={styles.prepCardHeader}>
+              <View style={styles.prepDot} />
+              <Text style={styles.prepTitle}>Phase de préparation</Text>
+            </View>
+            <Text style={styles.prepText}>
+              Ajoutez des musiques pour lancer la soirée !{' '}
+              <Text style={styles.prepCount}>
+                ({prepProgress.count || currentSession.approvedQueue?.length || 0} / 10)
+              </Text>
+            </Text>
+            <View style={styles.progressBarBg}>
+              <View
+                style={[
+                  styles.progressBarFill,
+                  { width: `${Math.min(100, ((prepProgress.count || currentSession.approvedQueue?.length || 0) / 10) * 100)}%` }
+                ]}
+              />
+            </View>
+          </View>
         )}
+
+        {/* 🟠 MODE VOTE / SKIP — ajout de ton pote, reskinné nouvelle UI */}
+        {currentSession.mode === 'vote' && currentSession.status === 'active' && (
+          <View style={styles.skipCard}>
+            <Text style={styles.skipLabel}>VOTE EN COURS · SKIP ?</Text>
+            <View style={styles.skipRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.skipVotes}>
+                  {skipData.currentVotes || 0}
+                  <Text style={styles.skipThreshold}> / {skipData.threshold || Math.ceil((currentSession.participants?.length || 1) / 2)}</Text>
+                </Text>
+                <Text style={styles.skipSub}>Majorité requise pour passer</Text>
+              </View>
+              <TouchableOpacity style={styles.skipBtn} onPress={handleSkip} activeOpacity={0.85}>
+                <Svg width={14 * S} height={14 * S} viewBox="0 0 16 16" fill="none">
+                  <Path d="M3 3.5L9.5 8L3 12.5V3.5Z" fill="#000" />
+                  <Path d="M12 3.5V12.5" stroke="#000" strokeWidth="2" strokeLinecap="round" />
+                </Svg>
+                <Text style={styles.skipBtnText}>Skip</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* Queue header */}
+        <View style={styles.queueHeader}>
+          <Text style={styles.queueTitle}>
+            File d'attente{' '}
+            <Text style={styles.queueCount}>({queue.length})</Text>
+          </Text>
+          {isHost && queue.length > 1 && (
+            <Text style={styles.queueHint}>Maintenez pour réorganiser</Text>
+          )}
+        </View>
+
+        {/* Queue list */}
+        <DraggableFlatList
+          data={queue}
+          keyExtractor={(item, index) => `${item.uri}-${index}`}
+          contentContainerStyle={[
+            styles.queueList,
+            { paddingBottom: Math.max(20 * S, insets.bottom) + 110 * S }
+          ]}
+          showsVerticalScrollIndicator={false}
+          onDragEnd={handleDragEnd}
+          activationDistance={isHost ? 10 : 999}
+          ListEmptyComponent={
+            <View style={styles.emptyWrap}>
+              <Text style={styles.emptyIcon}>🎵</Text>
+              <Text style={styles.emptyText}>La file d'attente est vide</Text>
+              <Text style={styles.emptySub}>Ajoutez vos premiers titres pour la soirée !</Text>
+            </View>
+          }
+          renderItem={({ item, index, drag, isActive }) => {
+            const isPlaying = index === 0;
+            return (
+              <ScaleDecorator>
+                <TouchableOpacity
+                  onLongPress={isHost ? drag : undefined}
+                  disabled={isActive}
+                  activeOpacity={1}
+                  style={[
+                    styles.trackRow,
+                    isPlaying && styles.trackRowPlaying,
+                    isActive && styles.trackRowDragging,
+                  ]}
+                >
+                  <Image
+                    source={{ uri: item.albumImage || 'https://via.placeholder.com/150' }}
+                    style={styles.trackCover}
+                  />
+                  <View style={styles.trackInfo}>
+                    <View style={styles.trackNameRow}>
+                      <Text
+                        style={[styles.trackName, isPlaying && styles.trackNamePlaying]}
+                        numberOfLines={1}
+                      >
+                        {item.name}
+                      </Text>
+                      {isPlaying && <EqBars />}
+                    </View>
+                    <Text style={styles.trackArtist} numberOfLines={1}>{item.artist}</Text>
+                  </View>
+                  {isHost && <DragHandle />}
+                </TouchableOpacity>
+              </ScaleDecorator>
+            );
+          }}
+        />
+
+        {/* Bottom actions — flottant */}
+        <View style={[styles.botActions, { paddingBottom: Math.max(20 * S, insets.bottom + 8) }]}>
+          <View style={styles.divider} />
+
+          <TouchableOpacity style={styles.btnAdd} onPress={handleAddTrack} activeOpacity={0.88}>
+            <Svg width={14 * S} height={14 * S} viewBox="0 0 16 16" fill="none">
+              <Circle cx="8" cy="8" r="6.5" stroke="#888" strokeWidth="1.2" />
+              <Path d="M8 5v6M5 8h6" stroke="#888" strokeWidth="1.4" strokeLinecap="round" />
+            </Svg>
+            <Text style={styles.btnAddText}>Ajouter un titre</Text>
+          </TouchableOpacity>
+
+          {isHost && (
+            <TouchableOpacity
+              style={[styles.btnPlay, starting && styles.btnPlayDisabled]}
+              onPress={handleStartParty}
+              disabled={starting}
+              activeOpacity={0.88}
+            >
+              {starting ? (
+                <ActivityIndicator color="#000" size="small" />
+              ) : (
+                <>
+                  <View style={styles.playIconWrap}>
+                    <Svg width={9 * S} height={10 * S} viewBox="0 0 10 12" fill="none">
+                      <Path d="M1.5 1.5L8.5 6L1.5 10.5V1.5Z" fill="#000" stroke="#000" strokeWidth="1" strokeLinejoin="round" />
+                    </Svg>
+                  </View>
+                  <Text style={styles.btnPlayText}>Lancer la lecture</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
+        </View>
+
       </View>
     </View>
+    </GestureHandlerRootView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000', paddingTop: 50, paddingHorizontal: 20 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
-  subtitle: { color: '#1DB954', fontSize: 12, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 1 },
-  title: { color: '#FFF', fontSize: 28, fontWeight: 'bold', marginTop: 5 },
-  closeBtn: { padding: 10, backgroundColor: '#282828', borderRadius: 20 },
+  container: { flex: 1, backgroundColor: '#050505' },
 
-  infoRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 30, gap: 15 },
-  codeBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1E1E1E', paddingVertical: 10, paddingHorizontal: 20, borderRadius: 20, borderWidth: 1, borderColor: '#333' },
-  codeText: { color: '#FFF', fontSize: 18, fontWeight: 'bold', letterSpacing: 3 },
-  participantsBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#121212', paddingVertical: 12, paddingHorizontal: 15, borderRadius: 20 },
-  participantsText: { color: '#B3B3B3', fontSize: 14, marginLeft: 8 },
+  /* ── TOP ── */
+  topHalf: {
+    backgroundColor: '#1DB954',
+    overflow: 'hidden',
+    paddingHorizontal: 24 * S,
+    paddingBottom: 20 * S,
+    justifyContent: 'space-between',
+  },
 
-  queueHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
-  sectionTitle: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
-  queueSubtitle: { color: '#666', fontSize: 12 },
-  
-  queueList: { flex: 1 },
-  trackItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#121212', padding: 15, borderRadius: 12, marginBottom: 10, borderWidth: 1, borderColor: '#282828' },
-  trackIndex: { color: '#666', fontSize: 16, fontWeight: 'bold', width: 30 },
-  trackInfo: { flex: 1, paddingRight: 10 },
-  trackName: { color: '#FFF', fontSize: 16, fontWeight: 'bold', marginBottom: 4 },
-  trackArtist: { color: '#B3B3B3', fontSize: 14 },
-  trackControls: { flexDirection: 'row', alignItems: 'center' },
-  arrowBtn: { padding: 5 },
+  topHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', zIndex: 2,
+  },
+  statusBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 6 * S,
+    backgroundColor: 'rgba(0,0,0,0.15)',
+    borderRadius: 100, paddingVertical: 4 * S, paddingHorizontal: 10 * S,
+  },
+  statusDot: { width: 5 * S, height: 5 * S, borderRadius: 3 * S, backgroundColor: '#000' },
+  statusText: {
+    fontFamily: 'Outfit_700Bold',
+    fontSize: 8 * S, letterSpacing: 8 * S * 0.12,
+    textTransform: 'uppercase', color: 'rgba(0,0,0,0.6)',
+  },
+  closeBtn: {
+    width: 32 * S, height: 32 * S, borderRadius: 16 * S,
+    backgroundColor: 'rgba(0,0,0,0.15)',
+    alignItems: 'center', justifyContent: 'center',
+  },
 
-  emptyQueue: { alignItems: 'center', justifyContent: 'center', marginTop: 50 },
-  emptyText: { color: '#FFF', fontSize: 18, fontWeight: 'bold', marginTop: 15, marginBottom: 5 },
-  emptySubtext: { color: '#666', fontSize: 14 },
+  topHero: { zIndex: 2 },
+  mainTitle: {
+    fontFamily: 'Outfit_900Black',
+    fontSize: 38 * S, letterSpacing: -38 * S * 0.04,
+    lineHeight: 38 * S * 1.05,
+    marginBottom: 14 * S,
+    includeFontPadding: false,
+  },
+  titleBlack: { color: '#000' },
+  titleWhite: { color: '#fff' },
 
-  footer: { paddingTop: 20, paddingBottom: 30, gap: 15 },
-  searchButton: { backgroundColor: '#282828', padding: 18, borderRadius: 30, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: '#444' },
-  searchButtonText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
-  startButton: { backgroundColor: '#1DB954', padding: 18, borderRadius: 30, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10 },
-  startButtonText: { color: '#000', fontSize: 16, fontWeight: 'bold' },
+  pillsRow: { flexDirection: 'row', gap: 8 * S, alignItems: 'center' },
+  pillCode: {
+    flexDirection: 'row', alignItems: 'center', gap: 7 * S,
+    backgroundColor: 'rgba(0,0,0,0.18)',
+    borderWidth: 1, borderColor: 'rgba(0,0,0,0.15)',
+    borderRadius: 100, paddingVertical: 6 * S, paddingHorizontal: 12 * S,
+  },
+  pillCodeText: {
+    fontFamily: 'Outfit_700Bold',
+    fontSize: 11 * S, letterSpacing: 11 * S * 0.1, color: 'rgba(0,0,0,0.7)',
+  },
+  pillCodeIcon: { fontSize: 11 * S, color: 'rgba(0,0,0,0.4)' },
+  pillGuests: {
+    flexDirection: 'row', alignItems: 'center', gap: 6 * S,
+    backgroundColor: 'rgba(0,0,0,0.18)',
+    borderWidth: 1, borderColor: 'rgba(0,0,0,0.15)',
+    borderRadius: 100, paddingVertical: 6 * S, paddingHorizontal: 12 * S,
+  },
+  pillGuestsText: {
+    fontFamily: 'DMSans_700Bold',
+    fontSize: 11 * S, color: 'rgba(0,0,0,0.7)',
+  },
 
-  // NOUVEAUX STYLES MODES
-  prepCard: { backgroundColor: '#1DB95420', borderRadius: 16, padding: 20, marginBottom: 25, borderWidth: 1, borderColor: '#1DB95450' },
-  prepInfo: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
-  prepTitle: { color: '#1DB954', fontSize: 16, fontWeight: 'bold' },
-  prepText: { color: '#B3B3B3', fontSize: 14, marginBottom: 15 },
-  progressBarBg: { height: 6, backgroundColor: '#1E1E1E', borderRadius: 3, overflow: 'hidden' },
-  progressBarFill: { height: '100%', backgroundColor: '#1DB954' },
+  /* ── BOT ── */
+  botHalf: { flex: 1, backgroundColor: '#050505', overflow: 'hidden' },
 
-  skipCard: { backgroundColor: '#121212', borderRadius: 16, padding: 18, marginBottom: 25, borderWidth: 1, borderColor: '#1DB954' },
-  skipLabel: { color: '#1DB954', fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginBottom: 12 },
-  skipInfo: { flexDirection: 'row', alignItems: 'center', gap: 15 },
-  skipVotes: { color: '#FFF', fontSize: 20, fontWeight: 'bold' },
-  skipSub: { color: '#666', fontSize: 12, marginTop: 2 },
-  skipBtn: { backgroundColor: '#1DB954', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 25, gap: 8 },
-  skipBtnText: { color: '#000', fontWeight: 'bold' }
+  /* Prep card — reskinné nouvelle UI */
+  prepCard: {
+    marginHorizontal: 16 * S, marginTop: 14 * S,
+    backgroundColor: 'rgba(29,185,84,0.07)',
+    borderWidth: 1, borderColor: 'rgba(29,185,84,0.2)',
+    borderRadius: 12 * S,
+    paddingVertical: 12 * S, paddingHorizontal: 14 * S,
+    gap: 8 * S,
+  },
+  prepCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 7 * S },
+  prepDot: { width: 6 * S, height: 6 * S, borderRadius: 3 * S, backgroundColor: '#1DB954' },
+  prepTitle: { fontFamily: 'Outfit_700Bold', fontSize: 11 * S, color: '#1DB954' },
+  prepText: { fontFamily: 'DMSans_400Regular', fontSize: 11 * S, color: '#555', lineHeight: 11 * S * 1.5 },
+  prepCount: { color: '#1DB954' },
+  progressBarBg: { height: 3 * S, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 2 * S, overflow: 'hidden' },
+  progressBarFill: { height: '100%', backgroundColor: '#1DB954', borderRadius: 2 * S },
+
+  /* Skip card — reskinné nouvelle UI */
+  skipCard: {
+    marginHorizontal: 16 * S, marginTop: 14 * S,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderWidth: 1, borderColor: 'rgba(29,185,84,0.3)',
+    borderRadius: 12 * S,
+    paddingVertical: 12 * S, paddingHorizontal: 14 * S,
+    gap: 8 * S,
+  },
+  skipLabel: {
+    fontFamily: 'Outfit_700Bold',
+    fontSize: 8 * S, letterSpacing: 8 * S * 0.14,
+    textTransform: 'uppercase', color: '#1DB954',
+  },
+  skipRow: { flexDirection: 'row', alignItems: 'center', gap: 12 * S },
+  skipVotes: { fontFamily: 'Outfit_700Bold', fontSize: 18 * S, color: '#fff' },
+  skipThreshold: { fontFamily: 'Outfit_400Regular', fontSize: 14 * S, color: '#444' },
+  skipSub: { fontFamily: 'DMSans_400Regular', fontSize: 10 * S, color: '#555', marginTop: 2 * S },
+  skipBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6 * S,
+    backgroundColor: '#1DB954',
+    borderRadius: 100, paddingVertical: 8 * S, paddingHorizontal: 14 * S,
+  },
+  skipBtnText: { fontFamily: 'Outfit_700Bold', fontSize: 11 * S, color: '#000' },
+
+  queueHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 22 * S, paddingTop: 16 * S, paddingBottom: 10 * S,
+    zIndex: 2,
+  },
+  queueTitle: { fontFamily: 'Outfit_800ExtraBold', fontSize: 14 * S, color: '#fff' },
+  queueCount: { fontFamily: 'Outfit_400Regular', fontSize: 12 * S, color: '#444' },
+  queueHint: { fontFamily: 'DMSans_400Regular', fontSize: 9 * S, color: '#444', letterSpacing: 0.4 },
+
+  queueList: { paddingHorizontal: 16 * S },
+
+  trackRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 11 * S,
+    paddingVertical: 8 * S, paddingHorizontal: 6 * S,
+    borderRadius: 10 * S,
+  },
+  trackRowPlaying: { backgroundColor: 'rgba(29,185,84,0.06)' },
+  trackRowDragging: {
+    backgroundColor: 'rgba(29,185,84,0.12)',
+    borderRadius: 10 * S,
+    shadowColor: '#1DB954',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  trackCover: { width: 38 * S, height: 38 * S, borderRadius: 8 * S, flexShrink: 0 },
+  trackInfo: { flex: 1, minWidth: 0 },
+  trackNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 * S },
+  trackName: { fontFamily: 'Outfit_700Bold', fontSize: 12 * S, color: '#fff', flexShrink: 1 },
+  trackNamePlaying: { color: '#1DB954' },
+  trackArtist: { fontFamily: 'DMSans_400Regular', fontSize: 10 * S, color: '#555', marginTop: S },
+
+  eqWrap: { flexDirection: 'row', alignItems: 'flex-end', gap: 2 * S, height: 14 * S },
+  eqBar: { width: 2 * S, borderRadius: S, backgroundColor: '#1DB954' },
+
+  dragHandle: { flexDirection: 'column', gap: 3 * S, opacity: 0.25, flexShrink: 0 },
+  dragLine: { width: 14 * S, height: 1.5, backgroundColor: '#fff', borderRadius: 2 },
+
+  emptyWrap: { alignItems: 'center', justifyContent: 'center', marginTop: 40 * S, paddingHorizontal: 40 * S },
+  emptyIcon: { fontSize: 40 * S },
+  emptyText: { fontFamily: 'Outfit_700Bold', fontSize: 16 * S, color: '#fff', marginTop: 16 * S, marginBottom: 6 * S },
+  emptySub: { fontFamily: 'DMSans_400Regular', fontSize: 13 * S, color: '#555', textAlign: 'center', lineHeight: 13 * S * 1.5 },
+
+  /* Bot actions */
+  botActions: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    paddingHorizontal: 16 * S, paddingTop: 10 * S,
+    backgroundColor: 'rgba(5,5,5,0.96)',
+    gap: 8 * S,
+  },
+  divider: { height: 1, backgroundColor: 'rgba(255,255,255,0.05)', marginBottom: 2 * S },
+
+  btnAdd: {
+    width: '100%',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 100, paddingVertical: 11 * S,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 * S,
+  },
+  btnAddText: { fontFamily: 'Outfit_600SemiBold', fontSize: 12 * S, color: '#888' },
+
+  btnPlay: {
+    width: '100%', backgroundColor: '#1DB954',
+    borderRadius: 100, paddingVertical: 10 * S,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 * S,
+    shadowColor: '#1DB954', shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3, shadowRadius: 24, elevation: 8,
+  },
+  btnPlayDisabled: { opacity: 0.65 },
+  playIconWrap: {
+    width: 24 * S, height: 24 * S, borderRadius: 12 * S,
+    backgroundColor: 'rgba(0,0,0,0.15)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  btnPlayText: { fontFamily: 'Outfit_700Bold', fontSize: 13 * S, letterSpacing: 13 * S * 0.03, color: '#000' },
 });
 
 export default SessionScreen;
