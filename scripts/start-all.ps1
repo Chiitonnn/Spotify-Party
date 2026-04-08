@@ -7,8 +7,8 @@ Write-Host "--- Starting Spotify-Party (Golden Solution) ---" -ForegroundColor C
 Remove-Item "ngrok_backend.log", "cf_mobile.log" -ErrorAction SilentlyContinue
 
 # 2. Start Backend Tunnel (Static Ngrok Domain)
-Write-Host "Starting Static Backend Tunnel (ngrok)..." -ForegroundColor Yellow
-$backendProcess = Start-Process "npx.cmd" -ArgumentList "ngrok", "http", "--domain=ripply-unconcentrated-lindy.ngrok-free.dev", "3000", "--log=stdout" -PassThru -NoNewWindow -RedirectStandardOutput "ngrok_backend.log"
+Write-Host "Starting Backend Tunnel (ngrok)..." -ForegroundColor Yellow
+$backendTunnelProcess = Start-Process "npx.cmd" -ArgumentList "ngrok", "http", "--domain=ripply-unconcentrated-lindy.ngrok-free.dev", "3000" -PassThru -NoNewWindow
 
 # 2.5 Start Actual Backend Server (Node.js)
 Write-Host "Starting Backend Server (Node.js)..." -ForegroundColor Yellow
@@ -18,31 +18,38 @@ $serverProcess = Start-Process "npm.cmd" -ArgumentList "run", "dev" -WorkingDire
 Write-Host "Starting Dynamic Mobile Tunnel (Cloudflare)..." -ForegroundColor Yellow
 $mobileProcess = Start-Process "npx.cmd" -ArgumentList "cloudflared", "tunnel", "--url", "http://localhost:8081" -PassThru -NoNewWindow -RedirectStandardError "cf_mobile.log"
 
-Write-Host "Waiting for Mobile URL..." -ForegroundColor Yellow
+Write-Host "Waiting for tunnels to stabilize..." -ForegroundColor Yellow
+Start-Sleep -Seconds 5
 
-$mobileUrl = ""
-$startTime = Get-Date
-
-while ([string]::IsNullOrWhiteSpace($mobileUrl) -and ((Get-Date) - $startTime).TotalSeconds -lt 30) {
-    if (Test-Path "cf_mobile.log") {
-        $content = Get-Content "cf_mobile.log" -Raw
-        if ($content -and ($content -match "(https://[a-z0-9-]+\.trycloudflare\.com)")) {
-            $mobileUrl = $matches[1]
-        }
+# Detect Actual Backend URL
+$backendUrl = "Could not detect"
+try {
+    $tunnels = (curl.exe -s http://localhost:4040/api/tunnels | ConvertFrom-Json)
+    if ($tunnels.tunnels.Length -gt 0) {
+        $backendUrl = $tunnels.tunnels[0].public_url
     }
-    Start-Sleep -Seconds 1
+} catch {
+    Write-Host "Warning: Could not contact Ngrok API on localhost:4040" -ForegroundColor Gray
 }
 
-if ([string]::IsNullOrWhiteSpace($mobileUrl)) {
-    Write-Host "Error: Could not get mobile tunnel URL. Check cf_mobile.log." -ForegroundColor Red
-    if (Test-Path "ngrok_backend.log") { Write-Host "Checking ngrok log..." ; Get-Content "ngrok_backend.log" -Tail 5 }
-    if ($backendProcess) { Stop-Process -Id $backendProcess.Id -Force -ErrorAction SilentlyContinue }
-    if ($mobileProcess) { Stop-Process -Id $mobileProcess.Id -Force -ErrorAction SilentlyContinue }
-    exit 1
+# Detect Mobile URL
+$mobileUrl = ""
+if (Test-Path "cf_mobile.log") {
+    $content = Get-Content "cf_mobile.log" -Raw
+    if ($content -and ($content -match "(https://[a-z0-9-]+\.trycloudflare\.com)")) {
+        $mobileUrl = $matches[1]
+    }
 }
 
-Write-Host "✅ Backend (Static): https://ripply-unconcentrated-lindy.ngrok-free.dev" -ForegroundColor Green
-Write-Host "✅ Mobile (Dynamic): $mobileUrl" -ForegroundColor Green
+Write-Host "`n--- NETWORKING STATUS ---" -ForegroundColor Cyan
+Write-Host "📍 Backend URL: $backendUrl" -ForegroundColor (if ($backendUrl -match "ripply") { "Green" } else { "Yellow" })
+Write-Host "📍 Mobile URL : $mobileUrl" -ForegroundColor Green
+Write-Host "-------------------------`n" -ForegroundColor Cyan
+
+if ($backendUrl -notmatch "ripply") {
+    Write-Host "⚠️  ATTENTION: L'URL backend ne correspond pas au domaine statique." -ForegroundColor Red
+    Write-Host "Si tu as une erreur 404, c'est parce que tu n'as pas réservé ce domaine sur ton compte Ngrok." -ForegroundColor Red
+}
 
 # 3. Start Expo
 Write-Host "Starting Expo..." -ForegroundColor Cyan
@@ -51,6 +58,6 @@ Set-Location -Path "mobile"
 npx.cmd expo start --clear
 
 # Cleanup
-if ($backendProcess) { Stop-Process -Id $backendProcess.Id -Force -ErrorAction SilentlyContinue }
+if ($backendTunnelProcess) { Stop-Process -Id $backendTunnelProcess.Id -Force -ErrorAction SilentlyContinue }
 if ($mobileProcess) { Stop-Process -Id $mobileProcess.Id -Force -ErrorAction SilentlyContinue }
 if ($serverProcess) { Stop-Process -Id $serverProcess.Id -Force -ErrorAction SilentlyContinue }
