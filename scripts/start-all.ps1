@@ -1,4 +1,4 @@
-# Master script for Spotify-Party (Golden Solution: Static Backend + Dynamic App)
+# Master script for Spotify-Party (Golden Solution + Tunnel)
 $ErrorActionPreference = "Stop"
 
 Write-Host "--- Starting Spotify-Party (Golden Solution) ---" -ForegroundColor Cyan
@@ -29,10 +29,10 @@ if (![string]::IsNullOrWhiteSpace($staticDomain)) {
 }
 
 Start-Sleep -Seconds 2
-# Vérification si le tunnel a réussi à s'ouvrir
+# Verification si le tunnel a reussi a s'ouvrir
 $checkTunnel = curl.exe -s http://localhost:4040/api/tunnels
 if ($null -eq $checkTunnel -or $checkTunnel -notmatch "public_url") {
-    Write-Host "⚠️  Le tunnel n'a pas pu démarrer avec le domaine configuré. Tentative en mode dynamique..." -ForegroundColor Yellow
+    Write-Host "Le tunnel n'a pas pu demarrer avec le domaine configure. Tentative en mode dynamique..." -ForegroundColor Yellow
     if ($backendTunnelProcess) { Stop-Process -Id $backendTunnelProcess.Id -Force -ErrorAction SilentlyContinue }
     $backendTunnelProcess = Start-Process "npx.cmd" -ArgumentList "-y", "ngrok", "http", "3000" -PassThru -NoNewWindow
 }
@@ -41,14 +41,8 @@ if ($null -eq $checkTunnel -or $checkTunnel -notmatch "public_url") {
 Write-Host "Starting Backend Server (Node.js)..." -ForegroundColor Yellow
 $serverProcess = Start-Process "npm.cmd" -ArgumentList "run", "dev" -WorkingDirectory "backend" -PassThru -NoNewWindow -RedirectStandardOutput "backend_server.log"
 
-# 3. Start Mobile Tunnel (Dynamic Cloudflare)
-Write-Host "Starting Dynamic Mobile Tunnel (Cloudflare)..." -ForegroundColor Yellow
-$mobileProcess = Start-Process "npx.cmd" -ArgumentList "-y", "cloudflared", "tunnel", "--url", "http://localhost:8081" -PassThru -NoNewWindow -RedirectStandardError "cf_mobile.log"
-
-Write-Host "Waiting for tunnels to stabilize..." -ForegroundColor Yellow
+# --- DETECTION URL BACKEND ---
 Start-Sleep -Seconds 5
-
-# Detect Actual Backend URL
 $backendUrl = "Could not detect"
 try {
     $tunnels = (curl.exe -s http://localhost:4040/api/tunnels | ConvertFrom-Json)
@@ -59,37 +53,23 @@ try {
     Write-Host "Warning: Could not contact Ngrok API on localhost:4040" -ForegroundColor Gray
 }
 
-# Detect Mobile URL
-$mobileUrl = ""
-if (Test-Path "cf_mobile.log") {
-    $content = Get-Content "cf_mobile.log" -Raw
-    if ($content -and ($content -match "(https://[a-z0-9-]+\.trycloudflare\.com)")) {
-        $mobileUrl = $matches[1]
-    }
-}
-
 # Choose color based on match with expected static domain
 $backendColor = "Yellow"
 if (![string]::IsNullOrWhiteSpace($staticDomain) -and $backendUrl -match $staticDomain) {
     $backendColor = "Green"
 }
 
-Write-Host "`n--- NETWORKING STATUS ---" -ForegroundColor Cyan
-Write-Host "📍 Backend URL: $backendUrl" -ForegroundColor $backendColor
-Write-Host "📍 Mobile URL : $mobileUrl" -ForegroundColor Green
-Write-Host "-------------------------`n" -ForegroundColor Cyan
+Write-Host " "
+Write-Host "--- NETWORKING STATUS ---" -ForegroundColor Cyan
+Write-Host "  Backend URL: $backendUrl" -ForegroundColor $backendColor
+Write-Host "-------------------------" -ForegroundColor Cyan
+Write-Host " "
 
-if (![string]::IsNullOrWhiteSpace($staticDomain) -and $backendUrl -notmatch $staticDomain) {
-    Write-Host "⚠️  ATTENTION: L'URL backend ne correspond pas au domaine configuré dans ton .env." -ForegroundColor Red
-    Write-Host "Vérifie tes identifiants Ngrok ou ta réservation de domaine." -ForegroundColor Red
-}
-
-# 3. Start Expo
-Write-Host "Starting Expo in TUNNEL mode (Accessible everywhere over 4G)..." -ForegroundColor Cyan
-Set-Location -Path "mobile"
+# 3. Start Expo (TUNNEL MODE)
+Write-Host "Starting Expo in TUNNEL mode..." -ForegroundColor Cyan
+Set-Location -Path mobile
 npx.cmd -y expo start --tunnel --clear
 
 # Cleanup
 if ($backendTunnelProcess) { Stop-Process -Id $backendTunnelProcess.Id -Force -ErrorAction SilentlyContinue }
-if ($mobileProcess) { Stop-Process -Id $mobileProcess.Id -Force -ErrorAction SilentlyContinue }
 if ($serverProcess) { Stop-Process -Id $serverProcess.Id -Force -ErrorAction SilentlyContinue }

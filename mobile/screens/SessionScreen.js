@@ -230,7 +230,14 @@ const SessionScreen = ({ navigation, route }) => {
 
         {/* Hero : titre + pills */}
         <View style={styles.topHero}>
-          <Text style={[styles.mainTitle, styles.titleBlack]}>
+          <Text 
+            style={[
+              styles.mainTitle, 
+              styles.titleBlack, 
+              (currentSession?.name?.length > 15) && { fontSize: 24 * S, lineHeight: 28 * S }
+            ]} 
+            numberOfLines={2}
+          >
             {currentSession?.name || 'Spotify Party'}
           </Text>
 
@@ -336,7 +343,7 @@ const SessionScreen = ({ navigation, route }) => {
           keyExtractor={(item, index) => `${item.uri}-${index}`}
           contentContainerStyle={[
             styles.queueList,
-            { paddingBottom: Math.max(20 * S, insets.bottom) + 180 * S }
+            { paddingBottom: Math.max(20 * S, insets.bottom) + 220 * S }
           ]}
           showsVerticalScrollIndicator={false}
           onDragEnd={handleDragEnd}

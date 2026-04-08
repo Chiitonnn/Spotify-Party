@@ -53,6 +53,15 @@ export const updateQueueOrder = async (sessionId, newQueue) => {
   }
 };
 
+export const submitVote = async (sessionId, voteData) => {
+  try {
+    const response = await api.post(`/votes/${sessionId}/vote`, voteData);
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};
+
 export const togglePlayPause = async (sessionId) => {
   const response = await api.post(`/sessions/${sessionId}/playback/toggle`);
   return response.data;
@@ -66,13 +75,4 @@ export const skipToNext = async (sessionId) => {
 export const skipToPrevious = async (sessionId) => {
   const response = await api.post(`/sessions/${sessionId}/playback/previous`);
   return response.data;
-};
-
-export const submitVote = async (sessionId, voteData) => {
-  try {
-    const response = await api.post(`/votes/${sessionId}/vote`, voteData);
-    return response.data;
-  } catch (error) {
-    throw error.response?.data || error.message;
-  }
 };
