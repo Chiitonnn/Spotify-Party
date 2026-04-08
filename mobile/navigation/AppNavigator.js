@@ -27,7 +27,7 @@ const AppNavigator = () => {
       <Stack.Screen 
         name="Home" 
         component={HomeScreen}
-        options={{ title: 'Spotify Party' }}
+        options={{ title: 'Spotify Party', headerShown: false }}
         
       />
       <Stack.Screen 
@@ -43,7 +43,7 @@ const AppNavigator = () => {
       <Stack.Screen 
         name="Session" 
         component={SessionScreen}
-        options={{ title: 'Session' }}
+        options={{ title: 'Session', headerShown: false }}
       />
       <Stack.Screen 
         name="Vote" 
