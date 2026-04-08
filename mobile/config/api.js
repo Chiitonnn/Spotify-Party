@@ -1,12 +1,9 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-// const API_URL = 'https://playlist-drunk-bunch-herb.trycloudflare.com/api'; // Changez pour votre IP en dev
-// const API_URL = 'https://playlist-drunk-bunch-herb.trycloudflare.com/api'; // partage co
-const API_URL = 'https://ripply-unconcentrated-lindy.ngrok-free.dev/api';
+import { BASE_URL } from '../config';
 
 const api = axios.create({
-  baseURL: API_URL,
+  baseURL: BASE_URL,
   timeout: 60000,
   headers: {
     'Content-Type': 'application/json'

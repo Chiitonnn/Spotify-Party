@@ -43,6 +43,7 @@ mobile/.expo/
 mobile/.expo-shared/
 mobile/web-build/
 mobile/dist/
+mobile/config.js
 mobile/*.orig.*
 mobile/*.jks
 mobile/*.p8

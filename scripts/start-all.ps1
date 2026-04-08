@@ -6,9 +6,36 @@ Write-Host "--- Starting Spotify-Party (Golden Solution) ---" -ForegroundColor C
 # 1. Clean old logs
 Remove-Item "ngrok_backend.log", "cf_mobile.log" -ErrorAction SilentlyContinue
 
-# 2. Start Backend Tunnel (Static Ngrok Domain)
-Write-Host "Starting Backend Tunnel (ngrok)..." -ForegroundColor Yellow
-$backendTunnelProcess = Start-Process "npx.cmd" -ArgumentList "ngrok", "http", "--domain=ripply-unconcentrated-lindy.ngrok-free.dev", "3000" -PassThru -NoNewWindow
+# 2. Start Backend Tunnel (Read from .env)
+Write-Host "Detecting Ngrok domain from .env..." -ForegroundColor Yellow
+$envPath = "backend/.env"
+$staticDomain = ""
+if (Test-Path $envPath) {
+    $envContent = Get-Content $envPath
+    foreach ($line in $envContent) {
+        if ($line -match "BACKEND_URL=https://([a-z0-9-]+)\.ngrok-free\.dev") {
+            $staticDomain = $matches[1]
+            break
+        }
+    }
+}
+
+if (![string]::IsNullOrWhiteSpace($staticDomain)) {
+    Write-Host "Starting Static Backend Tunnel (ngrok: $staticDomain)..." -ForegroundColor Yellow
+    $backendTunnelProcess = Start-Process "npx.cmd" -ArgumentList "-y", "ngrok", "http", "--domain=$staticDomain.ngrok-free.dev", "3000" -PassThru -NoNewWindow
+} else {
+    Write-Host "No static domain found in .env, starting dynamic tunnel..." -ForegroundColor Yellow
+    $backendTunnelProcess = Start-Process "npx.cmd" -ArgumentList "-y", "ngrok", "http", "3000" -PassThru -NoNewWindow
+}
+
+Start-Sleep -Seconds 2
+# Vérification si le tunnel a réussi à s'ouvrir
+$checkTunnel = curl.exe -s http://localhost:4040/api/tunnels
+if ($null -eq $checkTunnel -or $checkTunnel -notmatch "public_url") {
+    Write-Host "⚠️  Le tunnel n'a pas pu démarrer avec le domaine configuré. Tentative en mode dynamique..." -ForegroundColor Yellow
+    if ($backendTunnelProcess) { Stop-Process -Id $backendTunnelProcess.Id -Force -ErrorAction SilentlyContinue }
+    $backendTunnelProcess = Start-Process "npx.cmd" -ArgumentList "-y", "ngrok", "http", "3000" -PassThru -NoNewWindow
+}
 
 # 2.5 Start Actual Backend Server (Node.js)
 Write-Host "Starting Backend Server (Node.js)..." -ForegroundColor Yellow
@@ -16,7 +43,7 @@ $serverProcess = Start-Process "npm.cmd" -ArgumentList "run", "dev" -WorkingDire
 
 # 3. Start Mobile Tunnel (Dynamic Cloudflare)
 Write-Host "Starting Dynamic Mobile Tunnel (Cloudflare)..." -ForegroundColor Yellow
-$mobileProcess = Start-Process "npx.cmd" -ArgumentList "cloudflared", "tunnel", "--url", "http://localhost:8081" -PassThru -NoNewWindow -RedirectStandardError "cf_mobile.log"
+$mobileProcess = Start-Process "npx.cmd" -ArgumentList "-y", "cloudflared", "tunnel", "--url", "http://localhost:8081" -PassThru -NoNewWindow -RedirectStandardError "cf_mobile.log"
 
 Write-Host "Waiting for tunnels to stabilize..." -ForegroundColor Yellow
 Start-Sleep -Seconds 5
@@ -55,7 +82,7 @@ if ($backendUrl -notmatch "ripply") {
 Write-Host "Starting Expo..." -ForegroundColor Cyan
 $env:EXPO_PACKAGER_PROXY_URL = $mobileUrl
 Set-Location -Path "mobile"
-npx.cmd expo start --clear
+npx.cmd -y expo start --clear
 
 # Cleanup
 if ($backendTunnelProcess) { Stop-Process -Id $backendTunnelProcess.Id -Force -ErrorAction SilentlyContinue }

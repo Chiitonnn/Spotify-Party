@@ -8,7 +8,7 @@ Remove-Item "cloudflare_err.log" -ErrorAction SilentlyContinue
 Remove-Item "cloudflare_out.log" -ErrorAction SilentlyContinue
 
 # Start cloudflared for port 8081 in the background
-$tunnelProcess = Start-Process "npx.cmd" -ArgumentList "cloudflared", "tunnel", "--url", "http://localhost:8081" -PassThru -NoNewWindow -RedirectStandardError "cloudflare_err.log" -RedirectStandardOutput "cloudflare_out.log"
+$tunnelProcess = Start-Process "npx.cmd" -ArgumentList "-y", "cloudflared", "tunnel", "--url", "http://localhost:8081" -PassThru -NoNewWindow -RedirectStandardError "cloudflare_err.log" -RedirectStandardOutput "cloudflare_out.log"
 
 # Start Backend Server (Node.js)
 Write-Host "Starting Backend Server (Node.js)..." -ForegroundColor Yellow
