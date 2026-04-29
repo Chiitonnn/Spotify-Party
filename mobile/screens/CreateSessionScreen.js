@@ -3,6 +3,7 @@ import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   Alert, StatusBar, Platform, Keyboard,
   ActivityIndicator, Dimensions, Animated, ScrollView,
+  PanResponder,
 } from 'react-native';
 import Svg, { Circle, Path, Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -36,10 +37,104 @@ const BackArrow = () => (
   </Svg>
 );
 
+const SLIDER_MIN = 5;
+const SLIDER_MAX = 40;
+
+const MinimalSlider = ({ value, onChange }) => {
+  const trackRef = useRef(null);
+  const trackWidth = useRef(0);
+
+  const valueToPercent = (v) => (v - SLIDER_MIN) / (SLIDER_MAX - SLIDER_MIN);
+
+  const percentToValue = (pct) => {
+    const raw = pct * (SLIDER_MAX - SLIDER_MIN) + SLIDER_MIN;
+    return Math.round(Math.min(SLIDER_MAX, Math.max(SLIDER_MIN, raw)));
+  };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (evt) => {
+        if (trackWidth.current === 0) return;
+        trackRef.current?.measure((fx, fy, w, h, px) => {
+          const pct = (evt.nativeEvent.pageX - px) / w;
+          onChange(percentToValue(pct));
+        });
+      },
+      onPanResponderMove: (evt) => {
+        if (trackWidth.current === 0) return;
+        trackRef.current?.measure((fx, fy, w, h, px) => {
+          const pct = (evt.nativeEvent.pageX - px) / w;
+          onChange(percentToValue(pct));
+        });
+      },
+    })
+  ).current;
+
+  const pct = valueToPercent(value);
+
+  return (
+    <View style={msStyles.wrap}>
+      <View style={msStyles.counterRow}>
+        <Text style={msStyles.labelMin}>{SLIDER_MIN}</Text>
+        <Text style={msStyles.valueInline}><Text style={msStyles.valueBig}>{value}</Text> sons</Text>
+        <Text style={msStyles.labelMax}>{SLIDER_MAX}</Text>
+      </View>
+      <View
+        ref={trackRef}
+        onLayout={(e) => { trackWidth.current = e.nativeEvent.layout.width; }}
+        style={msStyles.track}
+        {...panResponder.panHandlers}
+      >
+        <View style={[msStyles.fill, { width: `${pct * 100}%` }]} />
+        <View style={[msStyles.thumb, { left: `${pct * 100}%` }]} />
+      </View>
+    </View>
+  );
+};
+
+const msStyles = StyleSheet.create({
+  wrap: { marginTop: 12 * S, paddingTop: 12 * S, borderTopWidth: 1, borderTopColor: 'rgba(29,185,84,0.12)' },
+  counterRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 14 * S },
+  labelMin: { fontFamily: 'DMSans_400Regular', fontSize: 10 * S, color: '#333' },
+  labelMax: { fontFamily: 'DMSans_400Regular', fontSize: 10 * S, color: '#333' },
+  valueInline: { fontFamily: 'DMSans_400Regular', fontSize: 10 * S, color: '#555' },
+  valueBig: { fontFamily: 'Outfit_700Bold', fontSize: 13 * S, color: '#1DB954' },
+  track: {
+    height: 3 * S,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 2 * S,
+    justifyContent: 'center',
+    marginHorizontal: 6 * S,
+  },
+  fill: {
+    position: 'absolute',
+    left: 0, top: 0, bottom: 0,
+    backgroundColor: '#1DB954',
+    borderRadius: 2 * S,
+  },
+  thumb: {
+    position: 'absolute',
+    width: 14 * S, height: 14 * S,
+    borderRadius: 7 * S,
+    backgroundColor: '#fff',
+    top: -(14 * S / 2 - 1.5 * S),
+    marginLeft: -(7 * S),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+});
+
+
 const CreateSessionScreen = ({ navigation }) => {
   const { setCurrentSession } = useSession();
   const [sessionName, setSessionName] = useState('');
   const [mode, setMode] = useState('classic'); 
+  const [trackLimit, setTrackLimit] = useState(10); // min 5, max 50
   const [loading, setLoading] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
@@ -80,7 +175,7 @@ const CreateSessionScreen = ({ navigation }) => {
         mode: mode, 
         playlistIds: [],
         votingThreshold: 1,
-        trackLimit: 50,
+        trackLimit: mode === 'vote' ? trackLimit : null,
       });
       setCurrentSession(session);
       navigation.replace('Session', { sessionId: session._id });
@@ -188,7 +283,12 @@ const CreateSessionScreen = ({ navigation }) => {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.modeTitle}>Vote (Skip)</Text>
-                <Text style={styles.modeDesc}>Tout le monde propose 10 sons, puis vote pour passer ou garder.</Text>
+                <Text style={styles.modeDesc}>Tout le monde propose des sons, puis vote pour passer ou garder.</Text>
+
+                {/* Sélecteur de sons — visible uniquement quand ce mode est sélectionné */}
+                {mode === 'vote' && (
+                  <MinimalSlider value={trackLimit} onChange={setTrackLimit} />
+                )}
               </View>
             </TouchableOpacity>
           </View>

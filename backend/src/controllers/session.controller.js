@@ -220,6 +220,16 @@ export const startParty = async (req, res) => {
       return res.status(400).json({ error: 'Aucune musique n\'a été votée !' });
     }
 
+    // En mode vote, on vérifie que le nombre minimum de sons est atteint
+    if (session.mode === 'vote') {
+      const required = session.trackLimit || 10;
+      if (session.approvedQueue.length < required) {
+        return res.status(400).json({ 
+          error: `Il faut au moins ${required} sons dans la file pour lancer la soirée ! (${session.approvedQueue.length}/${required})` 
+        });
+      }
+    }
+
     const spotifyApi = createSpotifyApi(user.spotifyAccessToken);
 
     const devicesData = await spotifyApi.getMyDevices();
@@ -301,13 +311,15 @@ export const addTrackToQueue = async (req, res) => {
 
     console.log(`📡 Ajout à la file : ${trackName} par l'utilisateur ${req.userId}`);
 
-    // --- LIMITE 10 MUSIQUES PAR PERSONNE ---
+    // --- LIMITE DYNAMIQUE PAR PERSONNE (basée sur trackLimit de la session) ---
     const userTrackCount = session.approvedQueue.filter(
       track => track.addedBy && track.addedBy.toString() === req.userId
     ).length;
 
-    if (userTrackCount >= 10) {
-      return res.status(403).json({ error: 'Vous avez atteint votre limite de 10 musiques !' });
+    const perUserLimit = session.trackLimit || 10;
+
+    if (userTrackCount >= perUserLimit) {
+      return res.status(403).json({ error: `Vous avez atteint votre limite de ${perUserLimit} musiques !` });
     }
     // ---------------------------------------
 

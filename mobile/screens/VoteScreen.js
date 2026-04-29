@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,8 @@ import {
   ActivityIndicator,
   Alert,
   StatusBar,
-  Keyboard
+  Keyboard,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as SpotifyService from '../services/spotify.service';
@@ -29,6 +30,30 @@ const VoteScreen = ({ navigation, route }) => {
   const [offset, setOffset] = useState(0);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true); // Est-ce qu'il reste des musiques à charger ?
+
+  // --- ANIMATION SUCCÈS ---
+  const [successTrackId, setSuccessTrackId] = useState(null);
+  const fillAnims = useRef({}).current; // map trackId -> Animated.Value
+
+  const getOrCreateFillAnim = (trackId) => {
+    if (!fillAnims[trackId]) {
+      fillAnims[trackId] = new Animated.Value(0);
+    }
+    return fillAnims[trackId];
+  };
+
+  const triggerSuccessAnimation = (trackId) => {
+    const anim = getOrCreateFillAnim(trackId);
+    anim.setValue(0);
+    setSuccessTrackId(trackId);
+    Animated.sequence([
+      Animated.timing(anim, { toValue: 1, duration: 500, useNativeDriver: false }),
+      Animated.delay(900),
+      Animated.timing(anim, { toValue: 0, duration: 300, useNativeDriver: false }),
+    ]).start(() => {
+      setSuccessTrackId(null);
+    });
+  };
 
   // Première recherche
   const handleSearch = async () => {
@@ -83,17 +108,23 @@ const VoteScreen = ({ navigation, route }) => {
     try {
       setAddingTrackId(track.id);
       
-      // 🚀 C'EST ICI QU'ON AJOUTE L'IMAGE AU PAYLOAD
+      // Bloquer si la limite est déjà atteinte (la réponse serveur peut aussi renvoyer une erreur)
+      // On laisse le serveur trancher mais on peut afficher un message clair
       await SessionService.addToQueue(sessionId, {
         trackUri: track.uri,
         trackName: track.name,
         artistName: track.artists.join(', '),
-        albumImage: track.albumImage // 👈 CETTE LIGNE MANQUAIT !
+        albumImage: track.albumImage
       });
       
-      Alert.alert('Succès ! 🎵', `${track.name} a été ajouté à la file.`);
+      triggerSuccessAnimation(track.id);
     } catch (error) {
-      Alert.alert('Oups', error.error || 'Impossible d\'ajouter la musique.');
+      const msg = error.error || '';
+      if (msg.toLowerCase().includes('limit') || msg.toLowerCase().includes('limite') || msg.toLowerCase().includes('maximum')) {
+        Alert.alert('File complète', `Le nombre maximum de sons a été atteint pour cette session.`);
+      } else {
+        Alert.alert('Oups', msg || 'Impossible d\'ajouter la musique.');
+      }
     } finally {
       setAddingTrackId(null);
     }
@@ -158,26 +189,56 @@ const VoteScreen = ({ navigation, route }) => {
               <Text style={styles.emptyText}>Aucun résultat pour "{query}".</Text>
             ) : null
           }
-          renderItem={({ item }) => (
-            <View style={styles.trackItem}>
-              <Image source={{ uri: item.albumImage }} style={styles.albumImage} />
-              <View style={styles.trackInfo}>
-                <Text style={styles.trackName} numberOfLines={1}>{item.name}</Text>
-                <Text style={styles.artistName} numberOfLines={1}>{item.artists.join(', ')}</Text>
-              </View>
-              <TouchableOpacity
-                style={styles.addButton}
-                onPress={() => handleAddTrack(item)}
-                disabled={addingTrackId === item.id}
-              >
-                {addingTrackId === item.id ? (
-                  <ActivityIndicator size="small" color="#FFF" />
-                ) : (
-                  <Ionicons name="add" size={24} color="#FFF" />
-                )}
-              </TouchableOpacity>
-            </View>
-          )}
+          renderItem={({ item }) => {
+            const isSuccess = successTrackId === item.id;
+            const fillAnim = getOrCreateFillAnim(item.id);
+            const bgColor = fillAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: ['#121212', '#1DB954'],
+            });
+            const borderColor = fillAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: ['#282828', '#17a349'],
+            });
+            return (
+              <Animated.View style={[styles.trackItem, { backgroundColor: bgColor, borderColor }]}>
+                <Image source={{ uri: item.albumImage }} style={styles.albumImage} />
+                <View style={styles.trackInfo}>
+                  <Animated.Text
+                    style={[
+                      styles.trackName,
+                      { color: fillAnim.interpolate({ inputRange: [0, 1], outputRange: ['#FFF', '#000'] }) }
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {item.name}
+                  </Animated.Text>
+                  <Animated.Text
+                    style={[
+                      styles.artistName,
+                      { color: fillAnim.interpolate({ inputRange: [0, 1], outputRange: ['#B3B3B3', 'rgba(0,0,0,0.65)'] }) }
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {item.artists.join(', ')}
+                  </Animated.Text>
+                </View>
+                <TouchableOpacity
+                  style={[styles.addButton, isSuccess && styles.addButtonSuccess]}
+                  onPress={() => handleAddTrack(item)}
+                  disabled={addingTrackId === item.id || isSuccess}
+                >
+                  {addingTrackId === item.id ? (
+                    <ActivityIndicator size="small" color="#FFF" />
+                  ) : isSuccess ? (
+                    <Ionicons name="checkmark" size={22} color="#1DB954" />
+                  ) : (
+                    <Ionicons name="add" size={24} color="#FFF" />
+                  )}
+                </TouchableOpacity>
+              </Animated.View>
+            );
+          }}
         />
       )}
     </View>
@@ -232,6 +293,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#1DB954',
     justifyContent: 'center',
     alignItems: 'center'
+  },
+  addButtonSuccess: {
+    backgroundColor: '#000',
   },
   emptyText: { color: '#B3B3B3', textAlign: 'center', marginTop: 50, fontSize: 16 }
 });

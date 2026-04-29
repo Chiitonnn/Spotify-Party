@@ -115,12 +115,24 @@ const SessionScreen = ({ navigation, route }) => {
       Alert.alert('File d\'attente vide', 'Ajoutez au moins une musique avant de lancer la soirée.');
       return;
     }
+    const limit = currentSession.trackLimit;
+    const count = currentSession.approvedQueue.length;
+    if (currentSession.mode === 'vote' && limit && count < limit) {
+      Alert.alert(
+        'Pas encore prêt',
+        `Il faut ${limit} sons pour lancer la session. Tu en as ${count} pour l'instant.`
+      );
+      return;
+    }
     try {
       setStarting(true);
       await SessionService.startParty(sessionId);
       Alert.alert('Succès ! 🎧', 'La musique se lance sur votre appareil.');
     } catch (error) {
-      Alert.alert('Attention', error.error || 'Vérifiez que Spotify est ouvert sur votre téléphone.');
+      Alert.alert(
+        'Attention',
+        error.error || 'Lancez d\'abord une musique manuellement sur Spotify, puis réessayez.'
+      );
     } finally {
       setStarting(false);
     }
@@ -279,29 +291,28 @@ const SessionScreen = ({ navigation, route }) => {
           </Svg>
         </View>
 
-        {/* 🟢 MODE PRÉPARATION */}
-        {currentSession.status === 'preparing' && (
-          <View style={styles.prepCard}>
-            <View style={styles.prepCardHeader}>
-              <View style={styles.prepDot} />
-              <Text style={styles.prepTitle}>Phase de préparation</Text>
+        {/* 🟢 MODE PRÉPARATION — barre de progression uniquement */}
+        {currentSession.status === 'preparing' && currentSession.mode === 'vote' && (() => {
+          const count = prepProgress.count ?? currentSession.approvedQueue?.length ?? 0;
+          const needed = prepProgress.needed ?? (currentSession.trackLimit > 0 ? currentSession.trackLimit : 0);
+          if (!needed) return null;
+          const pct = Math.min(100, (count / needed) * 100);
+          return (
+            <View style={styles.prepBarWrap}>
+              <View style={styles.prepBarMeta}>
+                <Text style={styles.prepBarCount}>
+                  {count}
+                  <Text style={styles.prepBarSlash}> / </Text>
+                  {needed}
+                </Text>
+                <Text style={styles.prepBarLabel}>sons ajoutés</Text>
+              </View>
+              <View style={styles.progressBarBg}>
+                <View style={[styles.progressBarFill, { width: `${pct}%` }]} />
+              </View>
             </View>
-            <Text style={styles.prepText}>
-              Ajoutez des musiques pour lancer la soirée !{' '}
-              <Text style={styles.prepCount}>
-                ({prepProgress.count || currentSession.approvedQueue?.length || 0} / 10)
-              </Text>
-            </Text>
-            <View style={styles.progressBarBg}>
-              <View
-                style={[
-                  styles.progressBarFill,
-                  { width: `${Math.min(100, ((prepProgress.count || currentSession.approvedQueue?.length || 0) / 10) * 100)}%` }
-                ]}
-              />
-            </View>
-          </View>
-        )}
+          );
+        })()}
 
         {/* 🟠 MODE VOTE / SKIP */}
         {currentSession.mode === 'vote' && currentSession.status === 'active' && (
@@ -466,17 +477,33 @@ const SessionScreen = ({ navigation, route }) => {
             </View>
           )}
 
-          {currentSession.isPartyStarted && !isHost && (
+          {currentSession.isPartyStarted && currentSession.mode === 'vote' && !isHost && (
             <View style={styles.guestControls}>
               <View style={styles.playingNoticeSmall}>
                 <EqBars />
                 <Text style={styles.playingNoticeTextSmall}>Synchro</Text>
               </View>
-              <TouchableOpacity style={styles.btnPass} onPress={handleSkip} activeOpacity={0.88}>
-                <Text style={styles.btnPassText}>
-                  Voter pour passer ⏭️ {skipData.threshold > 0 ? `(${skipData.currentVotes}/${skipData.threshold})` : ''}
-                </Text>
+              <TouchableOpacity style={styles.btnPass} onPress={handleSkip} activeOpacity={0.85}>
+                <View style={styles.btnPassInner}>
+                  <Svg width={13 * S} height={13 * S} viewBox="0 0 16 16" fill="none">
+                    <Path d="M3 3.5L9.5 8L3 12.5V3.5Z" fill="#fff" />
+                    <Path d="M12 3.5V12.5" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
+                  </Svg>
+                  <Text style={styles.btnPassText}>Voter pour passer</Text>
+                </View>
+                {skipData.threshold > 0 && (
+                  <View style={styles.btnPassBadge}>
+                    <Text style={styles.btnPassBadgeText}>{skipData.currentVotes}/{skipData.threshold}</Text>
+                  </View>
+                )}
               </TouchableOpacity>
+            </View>
+          )}
+
+          {currentSession.isPartyStarted && !isHost && currentSession.mode === 'classic' && (
+            <View style={styles.playingNoticeSmall}>
+              <EqBars />
+              <Text style={styles.playingNoticeTextSmall}>En cours de lecture</Text>
             </View>
           )}
         </View>
@@ -556,20 +583,31 @@ const styles = StyleSheet.create({
   /* ── BOT ── */
   botHalf: { flex: 1, backgroundColor: '#050505', overflow: 'hidden' },
 
-  /* Prep card — reskinné nouvelle UI */
-  prepCard: {
+  /* Prep bar — slim */
+  prepBarWrap: {
     marginHorizontal: 16 * S, marginTop: 14 * S,
-    backgroundColor: 'rgba(29,185,84,0.07)',
-    borderWidth: 1, borderColor: 'rgba(29,185,84,0.2)',
-    borderRadius: 12 * S,
-    paddingVertical: 12 * S, paddingHorizontal: 14 * S,
-    gap: 8 * S,
+    gap: 6 * S,
   },
-  prepCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 7 * S },
-  prepDot: { width: 6 * S, height: 6 * S, borderRadius: 3 * S, backgroundColor: '#1DB954' },
-  prepTitle: { fontFamily: 'Outfit_700Bold', fontSize: 11 * S, color: '#1DB954' },
-  prepText: { fontFamily: 'DMSans_400Regular', fontSize: 11 * S, color: '#555', lineHeight: 11 * S * 1.5 },
-  prepCount: { color: '#1DB954' },
+  prepBarMeta: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 4 * S,
+  },
+  prepBarCount: {
+    fontFamily: 'Outfit_700Bold',
+    fontSize: 13 * S,
+    color: '#1DB954',
+  },
+  prepBarSlash: {
+    color: '#333',
+  },
+  prepBarLabel: {
+    fontFamily: 'DMSans_400Regular',
+    fontSize: 10 * S,
+    color: '#444',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
   progressBarBg: { height: 3 * S, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 2 * S, overflow: 'hidden' },
   progressBarFill: { height: '100%', backgroundColor: '#1DB954', borderRadius: 2 * S },
 
@@ -692,14 +730,40 @@ const styles = StyleSheet.create({
   },
   btnPass: {
     flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(255,255,255,0.07)',
     borderRadius: 100,
-    paddingVertical: 12 * S,
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)'
+    paddingVertical: 10 * S,
+    paddingLeft: 14 * S,
+    paddingRight: 6 * S,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    gap: 8 * S,
+  },
+  btnPassInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7 * S,
   },
   btnPassText: {
-    color: '#FFF', fontFamily: 'Outfit_600SemiBold', fontSize: 12 * S
+    color: '#FFF',
+    fontFamily: 'Outfit_600SemiBold',
+    fontSize: 11 * S,
+  },
+  btnPassBadge: {
+    backgroundColor: '#1DB954',
+    borderRadius: 100,
+    paddingHorizontal: 9 * S,
+    paddingVertical: 4 * S,
+    minWidth: 32 * S,
+    alignItems: 'center',
+  },
+  btnPassBadgeText: {
+    fontFamily: 'Outfit_700Bold',
+    fontSize: 10 * S,
+    color: '#000',
   },
 
   currentTrackWrap: {

@@ -6,12 +6,22 @@ const SessionContext = createContext();
 export const useSession = () => useContext(SessionContext);
 
 export const SessionProvider = ({ children }) => {
-  const [currentSession, setCurrentSession] = useState(null);
+  const [currentSession, setCurrentSessionRaw] = useState(null);
+
+  const setCurrentSession = (session) => {
+    setCurrentSessionRaw(session);
+    if (session?.trackLimit) {
+      setPrepProgress(prev => ({
+        needed: session.trackLimit,
+        count: session.approvedQueue?.length ?? prev.count,
+      }));
+    }
+  };
   const [currentTrack, setCurrentTrack] = useState(null);
   const [votes, setVotes] = useState({});
   const [participants, setParticipants] = useState([]);
   const [skipData, setSkipData] = useState({ currentVotes: 0, threshold: 0 });
-  const [prepProgress, setPrepProgress] = useState({ count: 0, needed: 10 });
+  const [prepProgress, setPrepProgress] = useState({ count: 0, needed: 0 });
 
   useEffect(() => {
     if (currentSession) {
@@ -58,7 +68,8 @@ export const SessionProvider = ({ children }) => {
   };
 
   const handleQueueUpdated = (newQueue) => {
-    setCurrentSession(prev => prev ? { ...prev, approvedQueue: newQueue } : null);
+    setCurrentSessionRaw(prev => prev ? { ...prev, approvedQueue: newQueue } : null);
+    setPrepProgress(prev => ({ ...prev, count: newQueue.length }));
   };
 
   const handleTrackApproved = (data) => {

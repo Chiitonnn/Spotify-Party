@@ -15,11 +15,15 @@ export const submitVote = async (req, res) => {
       return res.status(404).json({ error: 'Session not found' });
     }
     
-    // 2. Vérif participant
+    // 2. Vérif participant OU hôte
     const isParticipant = session.participants.some(
       p => p.userId.toString() === req.userId
     );
-    if (!isParticipant) {
+    const isHost = session.hostId._id
+      ? session.hostId._id.toString() === req.userId
+      : session.hostId.toString() === req.userId;
+
+    if (!isParticipant && !isHost) {
       return res.status(403).json({ error: 'Not in session' });
     }
     
@@ -117,16 +121,17 @@ export const submitVote = async (req, res) => {
             message: `${track.name} ajoutée à la playlist de soirée !` 
           });
 
-          // ⚡ NOUVEAUTÉ : Gestion de la phase de préparation (10 sons)
+          // ⚡ Gestion de la phase de préparation (trackLimit sons)
           if (session.mode === 'vote' && session.status === 'preparing') {
-             if (session.approvedQueue.length >= 10) {
+             const needed = session.trackLimit || 10;
+             if (session.approvedQueue.length >= needed) {
                session.status = 'active';
                await session.save();
-               io.to(sessionId).emit('session_ready', { message: 'C\'est parti ! 10 musiques sont prêtes.' });
+               io.to(sessionId).emit('session_ready', { message: `C\'est parti ! ${needed} musiques sont prêtes.` });
              } else {
                io.to(sessionId).emit('preparation_progress', { 
                  count: session.approvedQueue.length, 
-                 needed: 10 
+                 needed: needed
                });
              }
           }
