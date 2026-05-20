@@ -12,6 +12,21 @@ Nous utilisons une architecture hybride optimisée pour le travail en équipe et
 -   **Mobile (Cloudflare + Config locale)** : Expo Go est exposé via un tunnel Cloudflare. Chaque développeur possède son propre fichier `mobile/config.js` pour pointer vers son propre backend.
 -   **Proxy OAuth Dynamique** : L'app mobile communique son URL actuelle au backend pour assurer des redirections OAuth fluides, peu importe le tunnel utilisé.
 
+### 📊 Flux de Données
+
+```mermaid
+graph TD
+    User((Utilisateur)) <--> Mobile[Application Mobile Expo]
+    Mobile <--> Backend[Serveur Node.js / Express]
+    Backend <--> DB[(MongoDB Atlas)]
+    Backend <--> Spotify[(Spotify Web API)]
+    
+    subgraph "Tunnels (Dev)"
+        Mobile -- "Cloudflare Tunnel" --> Expo[Expo Go]
+        Backend -- "Ngrok" --> Public[Public URL]
+    end
+```
+
 ---
 
 ## 🚀 Guide de Démarrage (Nouveau Développeur)

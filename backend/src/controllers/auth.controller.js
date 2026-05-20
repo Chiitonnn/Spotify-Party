@@ -3,6 +3,11 @@ import User from '../models/User.js';
 import { generateToken } from '../services/token.service.js';
 import { handleSpotifyCallback } from '../services/auth.service.js';
 
+/**
+ * Redirects the user to Spotify Authorization page or returns the Auth URL.
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ */
 export const login = (req, res) => {
   try {
     const { platform = 'web', callbackUrl } = req.query;
@@ -22,6 +27,12 @@ export const login = (req, res) => {
   }
 };
 
+/**
+ * Exchanges a Spotify authorization code for an access token.
+ * Used for manual/custom flows.
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ */
 export const exchangeCode = async (req, res) => {
   const { code, redirectUri } = req.body;
 
@@ -41,6 +52,12 @@ export const exchangeCode = async (req, res) => {
   }
 };
 
+/**
+ * Handle the redirect back from Spotify after user authorization.
+ * Handles both Web and Mobile redirection logic.
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ */
 export const callback = async (req, res) => {
   const { code, state, error: spotifyError } = req.query;
 
@@ -92,6 +109,11 @@ export const callback = async (req, res) => {
   }
 };
 
+/**
+ * Refreshes the Spotify access token for the authenticated user.
+ * @param {Object} req - Express request object (with userId from middleware).
+ * @param {Object} res - Express response object.
+ */
 export const refreshToken = async (req, res) => {
   try {
     const user = await User.findById(req.userId);
@@ -118,6 +140,11 @@ export const refreshToken = async (req, res) => {
   }
 };
 
+/**
+ * Returns the currently authenticated user's profile information.
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ */
 export const getCurrentUser = async (req, res) => {
   try {
     const user = await User.findById(req.userId).select('-spotifyAccessToken -spotifyRefreshToken');

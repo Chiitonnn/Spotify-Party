@@ -16,11 +16,15 @@ import {
   resumeSession
 } from '../controllers/session.controller.js';
 import { authenticate } from '../middleware/auth.middleware.js';
+import { 
+  validateSessionCreate, 
+  validateJoinSession 
+} from '../middleware/validate.middleware.js';
 
 const router = express.Router();
 
-router.post('/create', authenticate, createSession);
-router.post('/join', authenticate, joinSession);
+router.post('/create', authenticate, validateSessionCreate, createSession);
+router.post('/join', authenticate, validateJoinSession, joinSession);
 router.get('/last-closed', authenticate, getLastClosedSession);
 router.get('/:sessionId', authenticate, getSession);
 router.post('/:sessionId/resume', authenticate, resumeSession);

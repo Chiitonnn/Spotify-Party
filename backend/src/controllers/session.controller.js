@@ -5,6 +5,12 @@ import { getIO } from '../services/websocket.service.js';
 import { createSpotifyApi } from '../config/spotify.js';
 import { startPlaybackPolling } from '../services/playback.service.js';
 
+/**
+ * Creates a new Spotify Party session.
+ * Fetches tracks from selected playlists, shuffles them, and saves the session.
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ */
 export const createSession = async (req, res) => {
   try {
     // On récupère mode et trackLimit du front
@@ -80,6 +86,11 @@ export const createSession = async (req, res) => {
   }
 };
 
+/**
+ * Adds the authenticated user to an active session using a 6-character code.
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ */
 export const joinSession = async (req, res) => {
   try {
     const { code } = req.body;
@@ -116,6 +127,11 @@ export const joinSession = async (req, res) => {
   }
 };
 
+/**
+ * Fetches a session by its ID, including host and participant information.
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ */
 export const getSession = async (req, res) => {
   try {
     const session = await Session.findById(req.params.sessionId)
@@ -132,6 +148,12 @@ export const getSession = async (req, res) => {
   }
 };
 
+/**
+ * Removes the authenticated user from the session. 
+ * Deactivates the session if the host leaves.
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ */
 export const leaveSession = async (req, res) => {
   try {
     const session = await Session.findById(req.params.sessionId);
@@ -161,6 +183,11 @@ export const leaveSession = async (req, res) => {
   }
 };
 
+/**
+ * Deactivates a session. Can only be performed by the host.
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ */
 export const closeSession = async (req, res) => {
   try {
     const session = await Session.findById(req.params.sessionId);
@@ -184,6 +211,11 @@ export const closeSession = async (req, res) => {
   }
 };
 
+/**
+ * Updates the voting threshold required for a track to be added to the queue automatically.
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ */
 export const updateVotingThreshold = async (req, res) => {
   try {
     const { threshold } = req.body;
@@ -206,6 +238,12 @@ export const updateVotingThreshold = async (req, res) => {
   }
 };
 
+/**
+ * Begins playback for the session tracks on the host's Spotify device.
+ * Initializes the playback polling service.
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ */
 export const startParty = async (req, res) => {
   try {
     const { sessionId } = req.params;
@@ -301,6 +339,12 @@ export const startParty = async (req, res) => {
   }
 };
 
+/**
+ * Manually adds a track to the approved queue.
+ * Checks per-user track limits based on session settings.
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ */
 export const addTrackToQueue = async (req, res) => {
   try {
     const { sessionId } = req.params;
@@ -345,6 +389,11 @@ export const addTrackToQueue = async (req, res) => {
   }
 };
 
+/**
+ * Updates the order of tracks in the approved queue. Only available to the host.
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ */
 export const updateQueueOrder = async (req, res) => {
   try {
     const { sessionId } = req.params;
@@ -369,9 +418,11 @@ export const updateQueueOrder = async (req, res) => {
   }
 };
 
-// ==========================================
-// CONTRÔLES DE LECTURE (Play/Pause, Skip, Prev)
-// ==========================================
+/**
+ * Toggles playback (play/pause) on the host's Spotify device.
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ */
 export const togglePlayPause = async (req, res) => {
   try {
     const { sessionId } = req.params;
@@ -400,6 +451,11 @@ export const togglePlayPause = async (req, res) => {
   }
 };
 
+/**
+ * Skips to the next track in the queue.
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ */
 export const skipToNext = async (req, res) => {
   try {
     const { sessionId } = req.params;
@@ -425,6 +481,11 @@ export const skipToNext = async (req, res) => {
   }
 };
 
+/**
+ * Skips back to the previous track in the session history.
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ */
 export const skipToPrevious = async (req, res) => {
   try {
     const { sessionId } = req.params;
@@ -461,6 +522,11 @@ export const skipToPrevious = async (req, res) => {
   }
 };
 
+/**
+ * Returns the most recently closed session for the authenticated host.
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ */
 export const getLastClosedSession = async (req, res) => {
   try {
     const session = await Session.findOne({
@@ -479,6 +545,11 @@ export const getLastClosedSession = async (req, res) => {
   }
 };
 
+/**
+ * Reactivates a closed session. Only available to the host.
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ */
 export const resumeSession = async (req, res) => {
   try {
     const session = await Session.findById(req.params.sessionId);
