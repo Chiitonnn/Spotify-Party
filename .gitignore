@@ -68,3 +68,6 @@ coverage/
 *.tmp
 *.temp
 *.cache
+*.patch
+branches.txt
+changed_files.txt
