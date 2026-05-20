@@ -102,6 +102,13 @@ const SessionScreen = ({ navigation, route }) => {
     return () => { unsubscribe(); };
   }, [navigation, sessionId]);
 
+  useEffect(() => {
+    if (!currentSession && sessionId) {
+      console.log('Session fermée, retour à Home');
+      navigation.replace('Home');
+    }
+  }, [currentSession, sessionId, navigation]);
+
   const handleShareCode = async () => {
     try {
       await Share.share({ message: `Rejoins ma session Spotify Party avec le code: ${currentSession.code}` });

@@ -139,12 +139,24 @@ export const leaveSession = async (req, res) => {
       return res.status(404).json({ error: 'Session not found' });
     }
     
+    const wasHost = session.hostId.toString() === req.userId;
+    
     session.participants = session.participants.filter(
       p => p.userId.toString() !== req.userId
     );
     
-    if (session.hostId.toString() === req.userId) {
+    if (wasHost) {
       session.isActive = false;
+      await session.save();
+      
+      const io = getIO();
+      // 🔥 Envoyer une redirection à TOUS les participants
+      io.to(session._id.toString()).emit('session_closed', { 
+        reason: 'host_left',
+        redirectTo: '/'
+      });
+      
+      return res.json({ message: 'Session closed by host' });
     }
     
     await session.save();
@@ -176,7 +188,11 @@ export const closeSession = async (req, res) => {
     await session.save();
     
     const io = getIO();
-    io.to(session._id.toString()).emit('session_closed');
+    // 🔥 Envoyer une redirection avec plus d'infos
+    io.to(session._id.toString()).emit('session_closed', { 
+      reason: 'host_closed',
+      redirectTo: '/'
+    });
     
     res.json({ message: 'Session closed' });
   } catch (error) {
@@ -499,3 +515,4 @@ export const resumeSession = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+

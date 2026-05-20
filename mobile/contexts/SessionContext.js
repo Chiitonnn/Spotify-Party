@@ -7,6 +7,11 @@ export const useSession = () => useContext(SessionContext);
 
 export const SessionProvider = ({ children }) => {
   const [currentSession, setCurrentSessionRaw] = useState(null);
+  const [currentTrack, setCurrentTrack] = useState(null);
+  const [votes, setVotes] = useState({});
+  const [participants, setParticipants] = useState([]);
+  const [skipData, setSkipData] = useState({ currentVotes: 0, threshold: 0 });
+  const [prepProgress, setPrepProgress] = useState({ count: 0, needed: 0 });
 
   const setCurrentSession = (session) => {
     setCurrentSessionRaw(session);
@@ -17,12 +22,18 @@ export const SessionProvider = ({ children }) => {
       }));
     }
   };
-  const [currentTrack, setCurrentTrack] = useState(null);
-  const [votes, setVotes] = useState({});
-  const [participants, setParticipants] = useState([]);
-  const [skipData, setSkipData] = useState({ currentVotes: 0, threshold: 0 });
-  const [prepProgress, setPrepProgress] = useState({ count: 0, needed: 0 });
 
+  // ✅ FONCTION DE NETTOYAGE - NOUVEAU
+  const cleanupSession = () => {
+    console.log('🧹 Nettoyage complet de la session');
+    disconnectWebSocket();
+    setCurrentSession(null);
+    setCurrentTrack(null);
+    setParticipants([]);
+    setSkipData({ currentVotes: 0, threshold: 0 });
+  };
+
+  // ✅ MODIFICATION PRINCIPALE : plus de disconnect automatique
   useEffect(() => {
     if (currentSession) {
       const connectSocket = async () => {
@@ -40,11 +51,12 @@ export const SessionProvider = ({ children }) => {
         onEvent('preparation_progress', handlePrepProgress);
         onEvent('party_started', handlePartyStarted);
         onEvent('playback_state_changed', handlePlaybackStateChanged);
+        onEvent('host_disconnected', handleHostDisconnected);
       };
 
       connectSocket();
       
-      return () => disconnectWebSocket();
+      // ❌ SUPPRIMÉ : return () => disconnectWebSocket();
     }
   }, [currentSession]);
 
@@ -79,7 +91,6 @@ export const SessionProvider = ({ children }) => {
 
   const handleUserJoined = (data) => {
     setParticipants(prev => [...prev, data.userId]);
-    // ⚡ Mise à jour directe du contexte UI pour rafraîchir l'écran
     setCurrentSession(prev => prev ? { 
       ...prev, 
       participants: [...(prev.participants || []), { userId: data.userId }] 
@@ -88,16 +99,16 @@ export const SessionProvider = ({ children }) => {
 
   const handleUserLeft = (data) => {
     setParticipants(prev => prev.filter(id => id !== data.userId));
-    // ⚡ Rafraîchissement direct de la baisse du nombre de personnes
     setCurrentSession(prev => prev ? { 
       ...prev, 
       participants: (prev.participants || []).filter(p => p.userId !== data.userId && p.userId?._id !== data.userId) 
     } : null);
   };
 
-  const handleSessionClosed = () => {
-    setCurrentSession(null);
-    setCurrentTrack(null);
+  // ✅ MODIFIÉ : utilise cleanupSession
+  const handleSessionClosed = (data) => {
+    console.log('🔴 Session fermée par le host:', data?.reason || 'inconnu');
+    cleanupSession();
   };
 
   const handleSkipUpdate = (data) => {
@@ -107,7 +118,6 @@ export const SessionProvider = ({ children }) => {
   const handleTrackSkipped = (data) => {
     console.log('Track skipped:', data.message);
     setSkipData({ currentVotes: 0, threshold: 0 });
-    // Le refresh se fera via queue_updated ou polling si nécessaire
   };
 
   const handleSessionReady = (data) => {
@@ -116,6 +126,12 @@ export const SessionProvider = ({ children }) => {
 
   const handlePrepProgress = (data) => {
     setPrepProgress({ count: data.count, needed: data.needed });
+  };
+
+  // ✅ MODIFIÉ : utilise cleanupSession
+  const handleHostDisconnected = (data) => {
+    console.log('🔴 Hôte déconnecté:', data?.message || 'L\'hôte a quitté');
+    cleanupSession();
   };
 
   return (
