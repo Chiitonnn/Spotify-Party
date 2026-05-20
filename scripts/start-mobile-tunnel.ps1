@@ -42,7 +42,7 @@ Write-Host "Starting Expo with QR Code..." -ForegroundColor Cyan
 # Set the proxy URL environment variable and start expo
 $env:EXPO_PACKAGER_PROXY_URL = $tunnelUrl
 Set-Location -Path "mobile"
-npx.cmd expo start --clear
+npx.cmd expo start
 
 # Cleanup tunnel and server on exit
 Write-Host "Stopping tunnel and server..."

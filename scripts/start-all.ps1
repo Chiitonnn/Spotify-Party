@@ -65,11 +65,39 @@ Write-Host "  Backend URL: $backendUrl" -ForegroundColor $backendColor
 Write-Host "-------------------------" -ForegroundColor Cyan
 Write-Host " "
 
-# 3. Start Expo (TUNNEL MODE)
-Write-Host "Starting Expo in TUNNEL mode..." -ForegroundColor Cyan
+# 3. Start Mobile Tunnel (Cloudflare) and Expo
+Write-Host "Starting Mobile App Tunnel (Cloudflare on Port 8081)..." -ForegroundColor Cyan
+Remove-Item "cloudflare_err.log" -ErrorAction SilentlyContinue
+Remove-Item "cloudflare_out.log" -ErrorAction SilentlyContinue
+
+$cloudflareProcess = Start-Process "npx.cmd" -ArgumentList "-y", "cloudflared", "tunnel", "--url", "http://localhost:8081" -PassThru -NoNewWindow -RedirectStandardError "cloudflare_err.log" -RedirectStandardOutput "cloudflare_out.log"
+
+Write-Host "Waiting for Cloudflare tunnel URL..." -ForegroundColor Yellow
+$cfTunnelUrl = ""
+$startTime = Get-Date
+
+while ([string]::IsNullOrWhiteSpace($cfTunnelUrl) -and ((Get-Date) - $startTime).TotalSeconds -lt 25) {
+    if (Test-Path "cloudflare_err.log") { $content = Get-Content "cloudflare_err.log" -Raw }
+    if (Test-Path "cloudflare_out.log") { $content += Get-Content "cloudflare_out.log" -Raw }
+    
+    if ($content -match "https://[a-z0-9-]+\.trycloudflare\.com") {
+        $cfTunnelUrl = $matches[0]
+    }
+    Start-Sleep -Seconds 1
+}
+
+if ([string]::IsNullOrWhiteSpace($cfTunnelUrl)) {
+    Write-Host "Attention: Impossible de recup l'URL Cloudflare. Lancement en local sans proxy proxy." -ForegroundColor Red
+} else {
+    Write-Host "Mobile Tunnel Active: $cfTunnelUrl" -ForegroundColor Green
+    $env:EXPO_PACKAGER_PROXY_URL = $cfTunnelUrl
+}
+
+Write-Host "Starting Expo..." -ForegroundColor Cyan
 Set-Location -Path mobile
-npx.cmd -y expo start --tunnel --clear
+npx.cmd expo start
 
 # Cleanup
 if ($backendTunnelProcess) { Stop-Process -Id $backendTunnelProcess.Id -Force -ErrorAction SilentlyContinue }
 if ($serverProcess) { Stop-Process -Id $serverProcess.Id -Force -ErrorAction SilentlyContinue }
+if ($cloudflareProcess) { Stop-Process -Id $cloudflareProcess.Id -Force -ErrorAction SilentlyContinue }
