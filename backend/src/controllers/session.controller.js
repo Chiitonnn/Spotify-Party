@@ -460,3 +460,42 @@ export const skipToPrevious = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+export const getLastClosedSession = async (req, res) => {
+  try {
+    const session = await Session.findOne({
+      hostId: req.userId,
+      isActive: false,
+      'approvedQueue.0': { $exists: true }
+    }).sort({ updatedAt: -1 });
+
+    if (!session) {
+      return res.status(200).json(null);
+    }
+
+    res.json(session);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export const resumeSession = async (req, res) => {
+  try {
+    const session = await Session.findById(req.params.sessionId);
+    if (!session) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+    
+    if (session.hostId.toString() !== req.userId) {
+      return res.status(403).json({ error: 'Only host can resume' });
+    }
+
+    session.isActive = true;
+    session.isPlaying = false;
+    await session.save();
+
+    res.json(session);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};

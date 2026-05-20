@@ -76,3 +76,13 @@ export const skipToPrevious = async (sessionId) => {
   const response = await api.post(`/sessions/${sessionId}/playback/previous`);
   return response.data;
 };
+
+export const getLastClosedSession = async () => {
+  const response = await api.get('/sessions/last-closed');
+  return response.data;
+};
+
+export const resumeSession = async (sessionId) => {
+  const response = await api.post(`/sessions/${sessionId}/resume`);
+  return response.data;
+};

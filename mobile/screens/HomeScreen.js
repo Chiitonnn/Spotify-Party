@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,8 @@ import Svg, { Circle, Defs, RadialGradient, Stop, Rect } from 'react-native-svg'
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
+import { useFocusEffect } from '@react-navigation/native';
+import * as SessionService from '../services/session.service';
 
 const { width, height } = Dimensions.get('window');
 const S = width / 320;
@@ -69,6 +71,32 @@ export default function HomeScreen({ navigation }) {
   const { user, logout } = useAuth();
   const insets = useSafeAreaInsets();
   const initials = user?.displayName ? user.displayName.charAt(0).toUpperCase() : '?';
+
+  const [lastClosedSession, setLastClosedSession] = useState(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      const fetchLastSession = async () => {
+        try {
+          const session = await SessionService.getLastClosedSession();
+          setLastClosedSession(session);
+        } catch (err) {
+          console.log('Error fetching last closed session:', err);
+        }
+      };
+      fetchLastSession();
+    }, [])
+  );
+
+  const handleResumeSession = async () => {
+    if (!lastClosedSession) return;
+    try {
+      await SessionService.resumeSession(lastClosedSession._id);
+      navigation.navigate('Session', { sessionId: lastClosedSession._id });
+    } catch (err) {
+      console.log('Error resuming session:', err);
+    }
+  };
 
   // padding-top maquette : 46px + safe area iOS
   const topPaddingTop = Math.max(46 * S, insets.top + 8);
@@ -185,23 +213,26 @@ export default function HomeScreen({ navigation }) {
         </TouchableOpacity>
 
         {/* Dernière soirée active */}
-        <View style={styles.nowPlaying}>
-          <View style={styles.npCover}>
-            <Text style={styles.npEmoji}>🎵</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <View style={styles.npLabelRow}>
-              <BlinkDot />
-              {/* np-label : Space Mono (fallback Outfit) 8px */}
-              <Text style={styles.npLabel}>EN COURS</Text>
+        {lastClosedSession && (
+          <TouchableOpacity 
+            style={styles.nowPlaying} 
+            activeOpacity={0.88}
+            onPress={handleResumeSession}
+          >
+            <View style={styles.npCover}>
+              <Text style={styles.npEmoji}>🎵</Text>
             </View>
-            {/* np-title : Outfit 600 12px #ddd */}
-            <Text style={styles.npTitle}>Dernière soirée active</Text>
-            {/* np-sub : DM Sans 10px #555 */}
-            <Text style={styles.npSub}>Party de Lucas · 12 participants</Text>
-          </View>
-          <EqBars />
-        </View>
+            <View style={{ flex: 1 }}>
+              <View style={styles.npLabelRow}>
+                <BlinkDot />
+                <Text style={styles.npLabel}>EN ATTENTE</Text>
+              </View>
+              <Text style={styles.npTitle}>{lastClosedSession.name || 'Dernière soirée active'}</Text>
+              <Text style={styles.npSub}>{lastClosedSession.participants?.length || 0} participants</Text>
+            </View>
+            <EqBars />
+          </TouchableOpacity>
+        )}
 
       </View>
     </View>
